@@ -1,0 +1,15 @@
+langchain==0.3.12
+langchain-community==0.3.12
+langgraph==0.2.59
+langchain-openai==0.2.14
+playwright==1.49.1
+pydantic==2.10.5
+pydantic-settings==2.7.1
+httpx==0.28.1
+python-dotenv==1.0.1
+loguru==0.7.3
+
+# Utilities
+click==8.1.8  # CLI framework
+rich==13.9.4  # Beautiful terminal output
+pillow==11.0.0  # Image handling for screenshots
