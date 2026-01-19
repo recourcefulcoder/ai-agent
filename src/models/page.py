@@ -67,33 +67,3 @@ class PageAnalysis(BaseModel):
         default=False,
         description="Whether screenshot analysis would be helpful"
     )
-
-
-class VisionAnalysis(BaseModel):
-    """
-    Analysis of page screenshot using vision model.
-    """
-    screenshot_path: str = Field(
-        description="Path to the analyzed screenshot"
-    )
-    description: str = Field(
-        description="Natural language description of what's visible"
-    )
-    identified_elements: List[str] = Field(
-        default_factory=list,
-        description="Key UI elements identified in the screenshot"
-    )
-    suggested_clicks: List[str] = Field(
-        default_factory=list,
-        description="Elements that could be clicked to proceed"
-    )
-    warnings: List[str] = Field(
-        default_factory=list,
-        description="Any issues or concerns identified"
-    )
-    confidence: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Confidence in the analysis (0-1)"
-    )

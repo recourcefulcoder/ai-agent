@@ -24,6 +24,10 @@ An intelligent AI agent that automates complex browser-based tasks through natur
 git clone git@github.com:recourcefulcoder/ai-agent.git
 cd ai-agent
 
+# Create virtual environment and switch to it
+python3 -m venv venv
+source venv/bin/activate
+
 # Install dependencies
 pip install -r requirements.txt
 

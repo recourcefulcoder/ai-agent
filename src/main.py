@@ -28,7 +28,6 @@ async def run_task(task: str, debug: bool = False) -> None:
         task: Natural language task description
         debug: Whether to run in debug mode
     """
-    # Setup logging
     log_level = "DEBUG" if debug else settings.log_level
     setup_logger(log_level)
     
@@ -38,18 +37,14 @@ async def run_task(task: str, debug: bool = False) -> None:
         border_style="cyan"
     ))
     
-    # Initialize browser
     browser_manager = BrowserManager()
     
     try:
-        # Start browser
         await browser_manager.start()
         console.print("[green]✓[/green] Browser started")
         
-        # Create agent graph
         graph = get_agent_graph()
         
-        # Create initial state
         initial_state = create_initial_state(task)
         
         # Run the agent
@@ -75,12 +70,6 @@ async def run_task(task: str, debug: bool = False) -> None:
                 title="[bold red]Failed[/bold red]",
                 border_style="red"
             ))
-        
-        # Show artifacts if any
-        if final_state and final_state.get("screenshots_taken"):
-            console.print("\n[bold]Screenshots saved:[/bold]")
-            for screenshot in final_state["screenshots_taken"]:
-                console.print(f"  • {screenshot}")
     
     except KeyboardInterrupt:
         console.print("\n[yellow]Task interrupted by user[/yellow]")
@@ -144,12 +133,10 @@ def main(task: str, debug: bool, interactive: bool):
         
         $ python main.py --interactive
     """
-    # Validate input
     if not task and not interactive:
         console.print("[red]Error: Either provide a task or use --interactive mode[/red]")
         sys.exit(1)
     
-    # Run async function
     if interactive:
         asyncio.run(interactive_mode())
     else:

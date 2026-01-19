@@ -1,7 +1,3 @@
-"""
-Interaction tools for clicking, typing, and extracting content.
-"""
-
 from typing import Optional
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
