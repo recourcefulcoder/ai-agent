@@ -1,7 +1,3 @@
-"""
-Main entry point for the Browser AI Agent CLI.
-"""
-
 import asyncio
 import sys
 from pathlib import Path
@@ -100,7 +96,7 @@ async def interactive_mode() -> None:
     try:
         while True:
             # Get user input
-            task = console.input("\n[bold cyan]Task:[/bold cyan] ")
+            task = console.input("\n[bold cyan]Enter your task:[/bold cyan] ")
             
             if task.lower() in ("exit", "quit", "q"):
                 break

@@ -1,8 +1,3 @@
-"""
-Configuration settings for the Browser AI Agent.
-Loads environment variables and provides typed access to configuration.
-"""
-
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -19,36 +14,21 @@ class Settings(BaseSettings):
         extra="ignore"
     )
     
-    # OpenRouter Configuration
     openrouter_api_key: str
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     
-    # LLM Models
-    default_llm_model: str = "anthropic/claude-sonnet-4"
-    vision_llm_model: str = "anthropic/claude-sonnet-4"
+    default_llm_model: str = "z_ai/z-ai/glm-4.5-air:free"
     
-    # Browser Configuration
     browser_headless: bool = False
     browser_slow_mo: int = 100
     browser_timeout: int = 30000
     
-    # Agent Configuration
-    max_retries: int = 3
-    enable_vision: bool = True
+    max_retries: int = 3  # max agent task retires
     require_confirmation_for_sensitive: bool = True
     
-    # Logging
     log_level: str = "INFO"
     log_to_file: bool = True
     log_file_path: str = "logs/agent.log"
-    
-    # User Profile
-    user_profile_path: str = "data/user_profile.json"
-    encrypt_user_data: bool = True
-    
-    # Screenshots
-    screenshot_dir: str = "data/screenshots"
-    save_screenshots: bool = True
     
     @property
     def project_root(self) -> Path:
