@@ -1,10 +1,5 @@
-"""
-Browser lifecycle management using Playwright.
-Handles browser initialization, context creation, and cleanup.
-"""
-
 from typing import Optional
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+from playwright.async_api import Browser, BrowserContext, Page
 from config.settings import settings
 from utils.logger import logger
 

@@ -75,7 +75,6 @@ async def run_task(task: str, debug: bool = False) -> None:
         console.print(f"[red]Error: {str(e)}[/red]")
     
     finally:
-        # Clean up
         await browser_manager.stop()
         console.print("[green]✓[/green] Browser closed")
 
@@ -95,7 +94,6 @@ async def interactive_mode() -> None:
     
     try:
         while True:
-            # Get user input
             task = console.input("\n[bold cyan]Enter your task:[/bold cyan] ")
             
             if task.lower() in ("exit", "quit", "q"):
