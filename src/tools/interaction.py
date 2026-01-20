@@ -1,3 +1,6 @@
+import time
+from typing import List, Dict
+
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from browser.manager import BrowserManager
@@ -353,8 +356,8 @@ def create_interaction_tools(browser_manager: BrowserManager) -> list[BaseTool]:
         List of interaction tools
     """
     return [
-        ClickElementTool(browser_manager=browser_manager),
-        InputTextTool(browser_manager=browser_manager),
-        GetElementContextTool(browser_manager=browser_manager),
-        GetInteractiveElementsTool(browser_manager=browser_manager),
+        ClickElementTool(),
+        InputTextTool(),
+        GetElementContextTool(),
+        GetInteractiveElementsTool(),
     ]
