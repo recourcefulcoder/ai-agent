@@ -13,8 +13,8 @@ class ElementLocator:
     Provides intelligent element location strategies.
     """
     
-    def __init__(self, page: Page):
-        self.page = page
+    def __init__(self):
+        pass
     
     def find_semantic(self, description: str) -> Optional[Locator]:
         """

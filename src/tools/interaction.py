@@ -2,7 +2,9 @@ from typing import Optional
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from browser.manager import BrowserManager
+from browser.locator import ElementLocator
 from utils.logger import logger
+from services.tools_cache_manager import get_elements_cache
 
 class ClickElementInput(BaseModel):
     """Input schema for clicking an element."""
@@ -34,10 +36,6 @@ class GetInteractiveElementsInput(BaseModel):
 
 
 class ClickElementTool(BaseTool):
-    """
-    Tool for clicking on interactive elements by their ID.
-    """
-    
     name: str = "click_element"
     description: str = """
     Click on an interactive element on the page.
@@ -48,7 +46,6 @@ class ClickElementTool(BaseTool):
     """
     args_schema: type[BaseModel] = ClickElementInput
     browser_manager: BrowserManager = Field(exclude=True)
-    elements_cache: Dict[int, Dict[str, Any]] = Field(default_factory=dict, exclude=True)
     
     def _run(self, element_id: int) -> str:
         """
@@ -59,18 +56,16 @@ class ClickElementTool(BaseTool):
             
         Returns:
             Success or error message
-        """
-        logger.info(f"Clicking element with ID: {element_id}")
-        
+        """        
         page = self.browser_manager.current_page
+        cache = get_elements_cache().get_cache()
         if not page:
             return "Error: Browser not connected. Use the browser manager to connect first."
         
-        # Get element info from cache
-        if element_id not in self.elements_cache:
+        if element_id not in cache.keys():
             return f"Error: Element ID {element_id} not found. Use 'get_interactive_elements' first to get the list of elements."
         
-        element_info = self.elements_cache[element_id]
+        element_info = cache[element_id]
         selector = element_info['selector']
         
         try:
@@ -115,7 +110,6 @@ class InputTextTool(BaseTool):
     """
     args_schema: type[BaseModel] = InputTextInput
     browser_manager: BrowserManager = Field(exclude=True)
-    elements_cache: Dict[int, Dict[str, Any]] = Field(default_factory=dict, exclude=True)
     typing_delay: int = Field(default=50, exclude=True)  # Milliseconds between keystrokes
     
     def _run(self, element_id: int, text: str) -> str:
@@ -132,14 +126,15 @@ class InputTextTool(BaseTool):
         logger.info(f"Typing text into element {element_id}: '{text[:50]}...'")
         
         page = self.browser_manager.current_page
+        cache = get_elements_cache().get_cache()
         if not page:
             return "Error: Browser not connected."
         
         # Get element info from cache
-        if element_id not in self.elements_cache:
+        if element_id not in cache.keys():
             return f"Error: Element ID {element_id} not found. Use 'get_interactive_elements' first."
         
-        element_info = self.elements_cache[element_id]
+        element_info = cache[element_id]
         selector = element_info['selector']
         
         try:
@@ -189,7 +184,6 @@ class GetElementContextTool(BaseTool):
     """
     args_schema: type[BaseModel] = GetElementContextInput
     browser_manager: BrowserManager = Field(exclude=True)
-    elements_cache: Dict[int, Dict[str, Any]] = Field(default_factory=dict, exclude=True)
     
     def _run(self, element_id: int) -> str:
         """
@@ -204,13 +198,14 @@ class GetElementContextTool(BaseTool):
         logger.info(f"Getting context for element {element_id}")
         
         page = self.browser_manager.current_page
+        cache = get_elements_cache().get_cache()
         if not page:
             return "Error: Browser not connected."
         
-        if element_id not in self.elements_cache:
+        if element_id not in cache.keys():
             return f"Error: Element ID {element_id} not found."
         
-        element_info = self.elements_cache[element_id]
+        element_info = cache[element_id]
         selector = element_info['selector']
         
         try:
@@ -291,7 +286,6 @@ class GetInteractiveElementsTool(BaseTool):
     """
     args_schema: type[BaseModel] = GetInteractiveElementsInput
     browser_manager: BrowserManager = Field(exclude=True)
-    elements_cache: Dict[int, Dict[str, Any]] = Field(default_factory=dict, exclude=True)
     
     def _run(self) -> str:
         """
@@ -303,27 +297,29 @@ class GetInteractiveElementsTool(BaseTool):
         logger.info("Getting interactive elements from current page")
         
         page = self.browser_manager.current_page
+        cache_manager = get_elements_cache()
         if not page:
             return "Error: Browser not connected."
         
         try:
-            # Use ElementLocator to get all interactive elements
-            locator = ElementLocator(page)
+
+            locator = ElementLocator()
             elements = locator.list_interactive_elements(page)
             
-            # Clear and update the cache
-            self.elements_cache.clear()
+            cache_manager.clear_cache()
+            new_cache = dict()
             for element in elements:
-                self.elements_cache[element['id']] = element
+                new_cache[element['id']] = element
             
-            # Format the output
+            cache_manager.set_cache(new_cache)
+            
             if not elements:
                 return "No interactive elements found on the page."
             
             result = f"Found {len(elements)} interactive elements:\n\n"
             
             # Group by type for better readability
-            by_type: Dict[str, List[Dict]] = {}
+            by_type: Dict[str, List[Dict]] = dict()
             for elem in elements:
                 elem_type = elem.get('type', 'unknown')
                 if elem_type not in by_type:
