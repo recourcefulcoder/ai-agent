@@ -14,7 +14,6 @@ class ActionType(str, Enum):
     CLICK = "click"
     TYPE = "type"
     EXTRACT = "extract"
-    SCREENSHOT = "screenshot"
     WAIT = "wait"
     ANALYZE_PAGE = "analyze_page"
     REQUEST_CONFIRMATION = "request_confirmation"

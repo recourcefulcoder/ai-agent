@@ -4,13 +4,15 @@ Each node represents a step in the task execution workflow.
 """
 
 from typing import Dict, Any
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from agent.state import AgentState
 from models.task import TaskPlan, BrowserAction, ExecutionResult
+from tools.interaction import create_interaction_tools
+from tools.navigation import create_navigation_tools
 from utils.logger import logger
 
 
-async def plan_task_node(state: AgentState) -> Dict[str, Any]:
+def plan_task_node(state: AgentState) -> Dict[str, Any]:
     """
     Planning node: Analyzes user request and creates a task plan.
     
@@ -46,7 +48,7 @@ async def plan_task_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
-async def execute_action_node(state: AgentState) -> Dict[str, Any]:
+def execute_action_node(state: AgentState) -> Dict[str, Any]:
     """
     Execution node: Executes the current browser action.
     
@@ -82,7 +84,7 @@ async def execute_action_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
-async def verify_action_node(state: AgentState) -> Dict[str, Any]:
+def verify_action_node(state: AgentState) -> Dict[str, Any]:
     """
     Verification node: Checks if the last action succeeded.
     
@@ -108,7 +110,7 @@ async def verify_action_node(state: AgentState) -> Dict[str, Any]:
     return {}
 
 
-async def handle_error_node(state: AgentState) -> Dict[str, Any]:
+def handle_error_node(state: AgentState) -> Dict[str, Any]:
     """
     Error handling node: Attempts to recover from failures.
     
@@ -137,7 +139,7 @@ async def handle_error_node(state: AgentState) -> Dict[str, Any]:
     return {}
 
 
-async def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
+def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     """
     Confirmation node: Requests user confirmation for sensitive actions.
     
@@ -198,3 +200,23 @@ async def finalize_node(state: AgentState) -> Dict[str, Any]:
         "success": True,  # TODO: Calculate based on results
         "final_message": "Task completed!",  # TODO: Create detailed summary
     }
+
+
+def tool_node(state: AgentState):
+    """
+        tool_node performs tool calls and return results; 
+        copied straight up from docs
+    """
+    result = []
+    tools = (
+        create_navigation_tools(state.browser_manager) + 
+        create_interaction_tools(state.browser_manager)
+    )
+    tools_by_name = {tool.name: tool for tool in tools}
+    
+    for tool_call in state["messages"][-1].tool_calls:
+        tool = tools_by_name[tool_call["name"]]
+        observation = tool.invoke(tool_call["args"])
+        result.append(ToolMessage(content=observation, tool_call_id=tool_call["id"]))
+    return {"messages": result}
+

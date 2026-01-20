@@ -41,7 +41,7 @@ def run_task(
     try:
         if agent is None:
             agent = get_agent()
-            initial_state = create_initial_state(task)
+            initial_state = create_initial_state(task, browser_manager)
         
         # TODO: Stream or invoke the graph with initial state
         # TODO: Handle intermediate outputs (show progress)
@@ -79,7 +79,7 @@ def interactive_mode(browser_manager: BrowserManager, debug: bool = False) -> No
     ))
     
     agent = get_agent()
-    initial_state = create_initial_state(task)
+    initial_state = create_initial_state(task, browser_manager)
     try:
         while True:
             task = console.input("\n[bold cyan]Enter your task:[/bold cyan] ")

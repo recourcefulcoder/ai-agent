@@ -2,6 +2,7 @@ from typing import Annotated, List, Optional
 from typing_extensions import TypedDict
 from langgraph.graph import add_messages
 from models.task import TaskPlan, ExecutionResult, BrowserAction
+from browser.manager import BrowserManager
 
 
 class AgentState(TypedDict):
@@ -12,6 +13,7 @@ class AgentState(TypedDict):
     current_action: Optional[BrowserAction]
     current_action_index: int
     execution_results: List[ExecutionResult]
+    browser_manager: BrowserManager
     
     error_count: int
     last_error: Optional[str]
@@ -25,16 +27,10 @@ class AgentState(TypedDict):
     current_url: Optional[str]
 
 
-def create_initial_state(user_request: str) -> AgentState:
-    """
-    Create the initial state for a new task.
-    
-    Args:
-        user_request: The user's natural language request
-        
-    Returns:
-        Initial agent state
-    """
+def create_initial_state(
+    user_request: str, 
+    browser_manager: BrowserManager
+) -> AgentState:
     return AgentState(
         user_request=user_request,
         messages=[],
@@ -42,6 +38,7 @@ def create_initial_state(user_request: str) -> AgentState:
         current_action=None,
         current_action_index=0,
         execution_results=[],
+        browser_manager=browser_manager,
         error_count=0,
         last_error=None,
         pending_confirmation=None,
