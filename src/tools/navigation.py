@@ -20,6 +20,72 @@ class SearchInput(BaseModel):
     query: str = Field(description="The search query")
 
 
+class OpenPageInput(BaseModel):
+    """Input schema for opening a new page."""
+    url: str = Field(
+        description="The URL of the page to open (must include http:// or https://)"
+    )
+
+
+class OpenPageTool(BaseTool):
+    """
+    Tool for navigating to a new URL in the current browser session.
+    """
+    
+    name: str = "open_page"
+    description: str = """
+    Open a new page (navigate to a URL) in the current browser session.
+    The URL must include the protocol (http:// or https://).
+    
+    Example: open_page(url="https://www.google.com")
+    """
+    args_schema: type[BaseModel] = OpenPageInput
+    browser_manager: BrowserManager = Field(exclude=True)
+    
+    def _run(self, url: str) -> str:
+        """
+        Navigate to the specified URL.
+        
+        Args:
+            url: The URL to navigate to
+            
+        Returns:
+            Success message with page title and URL
+        """
+        logger.info(f"Navigating to: {url}")
+        
+        page = self.browser_manager.current_page
+        if not page:
+            return "Error: Browser not connected."
+        
+        # Validate URL format
+        if not url.startswith(('http://', 'https://')):
+            return "Error: URL must start with http:// or https://"
+        
+        try:
+            # Navigate to the URL
+            response = page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            
+            # Wait for page to be ready
+            page.wait_for_load_state("domcontentloaded")
+            
+            # Get page title
+            title = page.title()
+            current_url = page.url
+            
+            logger.info(f"Successfully navigated to: {current_url}")
+            
+            # Check if navigation was successful
+            if response and response.status >= 400:
+                return f"Warning: Page loaded with status {response.status}. URL: {current_url}, Title: '{title}'"
+            
+            return f"Successfully opened page: '{title}' at {current_url}"
+            
+        except Exception as e:
+            logger.error(f"Error navigating to {url}: {e}")
+            return f"Error opening page: {str(e)}"
+
+
 class NavigateToURLTool(BaseTool):
     """
     Tool for navigating to a specific URL.
@@ -79,11 +145,11 @@ class SearchGoogleTool(BaseTool):
     args_schema: type[BaseModel] = SearchInput
     browser_manager: BrowserManager = Field(exclude=True)
     
-    def _run(self, query: str) -> str:
-        """Synchronous version (not used)."""
+    def _arun(self, query: str) -> str:
+        """Asynchronous version (not used)."""
         raise NotImplementedError("Use async version")
     
-    async def _arun(self, query: str) -> str:
+    def _run(self, query: str) -> str:
         """
         Search Google for the query.
         
@@ -118,4 +184,5 @@ def create_navigation_tools(browser_manager: BrowserManager) -> list[BaseTool]:
     return [
         NavigateToURLTool(browser_manager=browser_manager),
         SearchGoogleTool(browser_manager=browser_manager),
+        OpenPageTool(browser_manager=browser_manager),
     ]

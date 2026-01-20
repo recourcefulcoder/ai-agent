@@ -2,158 +2,374 @@ from typing import Optional
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from browser.manager import BrowserManager
-from browser.locator import ElementLocator
 from utils.logger import logger
 
-
-class ClickInput(BaseModel):
-    """Input schema for click_element tool."""
-    description: str = Field(
-        description="Natural language description of the element to click (e.g., 'Submit button', 'Sign in link')"
+class ClickElementInput(BaseModel):
+    """Input schema for clicking an element."""
+    element_id: int = Field(
+        description="The ID of the element to click (from the interactive elements list)"
     )
 
 
-class TypeInput(BaseModel):
-    """Input schema for type_text tool."""
-    text: str = Field(description="The text to type")
-    target: Optional[str] = Field(
-        default=None,
-        description="Description of the input field to type into (if None, types into focused element)"
+class InputTextInput(BaseModel):
+    """Input schema for typing text into an element."""
+    element_id: int = Field(
+        description="The ID of the element to type into (from the interactive elements list)"
+    )
+    text: str = Field(
+        description="The text to type into the element"
     )
 
 
-class ExtractInput(BaseModel):
-    """Input schema for extract_text tool."""
-    selector: Optional[str] = Field(
-        default=None,
-        description="CSS selector for specific element (if None, extracts all visible text)"
+class GetElementContextInput(BaseModel):
+    """Input schema for getting element context."""
+    element_id: int = Field(
+        description="The ID of the element to get context for"
     )
+
+
+class GetInteractiveElementsInput(BaseModel):
+    """Input schema for getting all interactive elements on the page."""
+    pass  # No arguments needed
 
 
 class ClickElementTool(BaseTool):
     """
-    Tool for clicking on page elements.
+    Tool for clicking on interactive elements by their ID.
     """
     
     name: str = "click_element"
     description: str = """
-    Click on an element on the page.
-    Describe the element in natural language (e.g., "Submit button", "Login link", "Accept cookies").
-    The tool will intelligently locate and click the element.
+    Click on an interactive element on the page.
+    You must first use 'get_interactive_elements' to get the list of elements and their IDs.
+    Then use this tool with the element's ID to click it.
     
-    Example: click_element(description="Sign in button")
+    Example: click_element(element_id=5)
     """
-    args_schema: type[BaseModel] = ClickInput
+    args_schema: type[BaseModel] = ClickElementInput
     browser_manager: BrowserManager = Field(exclude=True)
+    elements_cache: Dict[int, Dict[str, Any]] = Field(default_factory=dict, exclude=True)
     
-    def _run(self, description: str) -> str:
-        """Synchronous version (not used)."""
-        raise NotImplementedError("Use async version")
-    
-    async def _arun(self, description: str) -> str:
+    def _run(self, element_id: int) -> str:
         """
-        Click on the described element.
+        Click on the element with the given ID.
         
         Args:
-            description: Natural language description of the element
+            element_id: The ID of the element to click
             
         Returns:
-            Success or failure message
+            Success or error message
         """
-        logger.info(f"Clicking element: {description}")
+        logger.info(f"Clicking element with ID: {element_id}")
         
-        # TODO: Get current page from browser manager
-        # TODO: Create ElementLocator
-        # TODO: Find element using semantic search
-        # TODO: Verify element is visible and clickable
-        # TODO: Click the element
-        # TODO: Wait briefly for any navigation/changes
-        # TODO: Return success message
+        page = self.browser_manager.current_page
+        if not page:
+            return "Error: Browser not connected. Use the browser manager to connect first."
         
-        pass
+        # Get element info from cache
+        if element_id not in self.elements_cache:
+            return f"Error: Element ID {element_id} not found. Use 'get_interactive_elements' first to get the list of elements."
+        
+        element_info = self.elements_cache[element_id]
+        selector = element_info['selector']
+        
+        try:
+            # Locate the element
+            element = page.locator(selector).first
+            
+            # Check if element exists
+            if element.count() == 0:
+                return f"Error: Element with selector '{selector}' not found on the page. The page may have changed."
+            
+            # Check if element is visible
+            if not element.is_visible():
+                logger.warning(f"Element {element_id} is not visible, attempting to scroll into view")
+                element.scroll_into_view_if_needed()
+            
+            # Click the element
+            element.click()
+            logger.info(f"Successfully clicked element: {element_info.get('type')} - {element_info.get('contents', 'N/A')}")
+            
+            # Wait a bit for any page changes
+            time.sleep(0.5)
+            
+            return f"Successfully clicked: {element_info.get('type')} '{element_info.get('label') or element_info.get('contents', 'element')}'"
+            
+        except Exception as e:
+            logger.error(f"Error clicking element {element_id}: {e}")
+            return f"Error clicking element: {str(e)}"
 
 
-class TypeTextTool(BaseTool):
+class InputTextTool(BaseTool):
     """
-    Tool for typing text into input fields.
+    Tool for typing text into input fields by element ID.
     """
     
-    name: str = "type_text"
+    name: str = "input_text"
     description: str = """
-    Type text into an input field.
-    If target is specified, finds and focuses that field first.
-    If target is None, types into the currently focused element.
+    Type text into an input field, textarea, or other text-accepting element.
+    You must first use 'get_interactive_elements' to find input fields and their IDs.
+    Text is typed letter-by-letter with a visible delay.
     
-    Example: type_text(text="john@example.com", target="Email input field")
+    Example: input_text(element_id=3, text="john@example.com")
     """
-    args_schema: type[BaseModel] = TypeInput
+    args_schema: type[BaseModel] = InputTextInput
     browser_manager: BrowserManager = Field(exclude=True)
+    elements_cache: Dict[int, Dict[str, Any]] = Field(default_factory=dict, exclude=True)
+    typing_delay: int = Field(default=50, exclude=True)  # Milliseconds between keystrokes
     
-    def _run(self, text: str, target: Optional[str] = None) -> str:
-        """Synchronous version (not used)."""
-        raise NotImplementedError("Use async version")
-    
-    async def _arun(self, text: str, target: Optional[str] = None) -> str:
+    def _run(self, element_id: int, text: str) -> str:
         """
-        Type text into an input field.
+        Type text into the element with the given ID.
         
         Args:
+            element_id: The ID of the element to type into
             text: The text to type
-            target: Optional description of the input field
             
         Returns:
-            Success message
+            Success or error message
         """
-        logger.info(f"Typing text into: {target or 'focused element'}")
+        logger.info(f"Typing text into element {element_id}: '{text[:50]}...'")
         
-        # TODO: Get current page
-        # TODO: If target specified, find and click the input field
-        # TODO: Clear existing text if any
-        # TODO: Type the text with realistic delay
-        # TODO: Return success message
+        page = self.browser_manager.current_page
+        if not page:
+            return "Error: Browser not connected."
         
-        pass
+        # Get element info from cache
+        if element_id not in self.elements_cache:
+            return f"Error: Element ID {element_id} not found. Use 'get_interactive_elements' first."
+        
+        element_info = self.elements_cache[element_id]
+        selector = element_info['selector']
+        
+        try:
+            # Locate the element
+            element = page.locator(selector).first
+            
+            if element.count() == 0:
+                return f"Error: Element not found on the page."
+            
+            # Scroll into view if needed
+            if not element.is_visible():
+                element.scroll_into_view_if_needed()
+            
+            # Click to focus the element first
+            element.click()
+            time.sleep(0.2)
+            
+            # Clear existing text if any
+            element.fill("")
+            time.sleep(0.1)
+            
+            # Type the text with delay (letter-by-letter)
+            element.type(text, delay=self.typing_delay)
+            
+            logger.info(f"Successfully typed text into: {element_info.get('type')}")
+            
+            return f"Successfully typed text into: {element_info.get('label') or element_info.get('type', 'element')}"
+            
+        except Exception as e:
+            logger.error(f"Error typing into element {element_id}: {e}")
+            return f"Error typing text: {str(e)}"
 
 
-class ExtractTextTool(BaseTool):
+class GetElementContextTool(BaseTool):
     """
-    Tool for extracting text from the page.
+    Tool for getting contextual information about an element.
+    Returns information about parent elements up to the first text-containing block or 5 levels up.
     """
     
-    name: str = "extract_text"
+    name: str = "get_element_context"
     description: str = """
-    Extract text content from the page.
-    If selector is provided, extracts text from that specific element.
-    Otherwise, extracts all visible text from the page.
+    Get contextual information about an element by examining its parent elements.
+    This helps understand what section of the page the element belongs to.
+    Returns information about parent elements up to the first block containing text or 5 levels up.
     
-    Example: extract_text(selector=".product-price")
+    Example: get_element_context(element_id=7)
     """
-    args_schema: type[BaseModel] = ExtractInput
+    args_schema: type[BaseModel] = GetElementContextInput
     browser_manager: BrowserManager = Field(exclude=True)
+    elements_cache: Dict[int, Dict[str, Any]] = Field(default_factory=dict, exclude=True)
     
-    def _run(self, selector: Optional[str] = None) -> str:
-        """Synchronous version (not used)."""
-        raise NotImplementedError("Use async version")
-    
-    async def _arun(self, selector: Optional[str] = None) -> str:
+    def _run(self, element_id: int) -> str:
         """
-        Extract text from the page.
+        Get contextual information about the element.
         
         Args:
-            selector: Optional CSS selector for specific element
+            element_id: The ID of the element to get context for
             
         Returns:
-            Extracted text content
+            Context information as a formatted string
         """
-        logger.info(f"Extracting text from: {selector or 'entire page'}")
+        logger.info(f"Getting context for element {element_id}")
         
-        # TODO: Get current page
-        # TODO: If selector provided, find element and get text
-        # TODO: Otherwise, get all visible text from page
-        # TODO: Clean and format the text
-        # TODO: Return extracted text
+        page = self.browser_manager.current_page
+        if not page:
+            return "Error: Browser not connected."
         
-        pass
+        if element_id not in self.elements_cache:
+            return f"Error: Element ID {element_id} not found."
+        
+        element_info = self.elements_cache[element_id]
+        selector = element_info['selector']
+        
+        try:
+            element = page.locator(selector).first
+            
+            if element.count() == 0:
+                return "Error: Element not found on the page."
+            
+            # Get parent hierarchy information
+            context_info = element.evaluate('''(el) => {
+                const context = [];
+                let current = el.parentElement;
+                let level = 0;
+                const maxLevels = 5;
+                
+                while (current && level < maxLevels) {
+                    const text = current.innerText?.trim() || '';
+                    const hasText = text.length > 0 && text.length < 500;
+                    
+                    context.push({
+                        level: level + 1,
+                        tagName: current.tagName.toLowerCase(),
+                        id: current.id || null,
+                        className: current.className || null,
+                        text: hasText ? text.substring(0, 200) : null,
+                        hasText: hasText
+                    });
+                    
+                    // Stop if we found a parent with text content
+                    if (hasText) break;
+                    
+                    current = current.parentElement;
+                    level++;
+                }
+                
+                return context;
+            }''')
+            
+            # Format the context information
+            result = f"Context for element {element_id} ({element_info.get('type')}):\n\n"
+            result += f"Element: {element_info.get('label') or element_info.get('contents', 'N/A')}\n"
+            result += f"Selector: {selector}\n\n"
+            result += "Parent hierarchy:\n"
+            
+            for ctx in context_info:
+                result += f"\nLevel {ctx['level']}: <{ctx['tagName']}>"
+                if ctx['id']:
+                    result += f" id='{ctx['id']}'"
+                if ctx['className']:
+                    class_str = ctx['className'][:50]
+                    result += f" class='{class_str}...'" if len(ctx['className']) > 50 else f" class='{ctx['className']}'"
+                if ctx['text']:
+                    result += f"\n  Text: {ctx['text'][:150]}..."
+                if ctx['hasText']:
+                    result += "\n  (Stopped: found text-containing block)"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting context for element {element_id}: {e}")
+            return f"Error getting element context: {str(e)}"
+
+
+class GetInteractiveElementsTool(BaseTool):
+    """
+    Tool for getting all interactive elements on the current page.
+    """
+    
+    name: str = "get_interactive_elements"
+    description: str = """
+    Get a list of all interactive elements on the current page.
+    Returns information about buttons, links, inputs, and other clickable elements.
+    Each element gets a unique ID that can be used with other tools like click_element or input_text.
+    
+    Use this tool first to understand what elements are available on the page.
+    
+    Example: get_interactive_elements()
+    """
+    args_schema: type[BaseModel] = GetInteractiveElementsInput
+    browser_manager: BrowserManager = Field(exclude=True)
+    elements_cache: Dict[int, Dict[str, Any]] = Field(default_factory=dict, exclude=True)
+    
+    def _run(self) -> str:
+        """
+        Get all interactive elements on the current page.
+        
+        Returns:
+            Formatted list of interactive elements
+        """
+        logger.info("Getting interactive elements from current page")
+        
+        page = self.browser_manager.current_page
+        if not page:
+            return "Error: Browser not connected."
+        
+        try:
+            # Use ElementLocator to get all interactive elements
+            locator = ElementLocator(page)
+            elements = locator.list_interactive_elements(page)
+            
+            # Clear and update the cache
+            self.elements_cache.clear()
+            for element in elements:
+                self.elements_cache[element['id']] = element
+            
+            # Format the output
+            if not elements:
+                return "No interactive elements found on the page."
+            
+            result = f"Found {len(elements)} interactive elements:\n\n"
+            
+            # Group by type for better readability
+            by_type: Dict[str, List[Dict]] = {}
+            for elem in elements:
+                elem_type = elem.get('type', 'unknown')
+                if elem_type not in by_type:
+                    by_type[elem_type] = []
+                by_type[elem_type].append(elem)
+            
+            # Format each group
+            for elem_type, type_elements in by_type.items():
+                result += f"\n{elem_type.upper()} ({len(type_elements)}):\n"
+                result += "-" * 50 + "\n"
+                
+                for elem in type_elements[:10]:  # Limit to first 10 per type
+                    result += f"  ID {elem['id']}: "
+                    
+                    # Show label or contents
+                    if elem.get('label'):
+                        result += f"'{elem['label']}'"
+                    elif elem.get('aria_label'):
+                        result += f"'{elem['aria_label']}'"
+                    elif elem.get('placeholder'):
+                        result += f"[{elem['placeholder']}]"
+                    elif elem.get('contents'):
+                        content = elem['contents'][:50]
+                        result += f"'{content}...'" if len(elem['contents']) > 50 else f"'{content}'"
+                    else:
+                        result += "(no label)"
+                    
+                    # Add visibility status
+                    if not elem.get('is_visible', True):
+                        result += " [HIDDEN]"
+                    if not elem.get('is_enabled', True):
+                        result += " [DISABLED]"
+                    
+                    result += "\n"
+                
+                if len(type_elements) > 10:
+                    result += f"  ... and {len(type_elements) - 10} more\n"
+            
+            result += f"\nTotal: {len(elements)} elements available for interaction"
+            
+            logger.info(f"Cached {len(elements)} elements")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting interactive elements: {e}")
+            return f"Error getting interactive elements: {str(e)}"
 
 
 def create_interaction_tools(browser_manager: BrowserManager) -> list[BaseTool]:
@@ -168,6 +384,7 @@ def create_interaction_tools(browser_manager: BrowserManager) -> list[BaseTool]:
     """
     return [
         ClickElementTool(browser_manager=browser_manager),
-        TypeTextTool(browser_manager=browser_manager),
-        ExtractTextTool(browser_manager=browser_manager),
+        InputTextTool(browser_manager=browser_manager),
+        GetElementContextTool(browser_manager=browser_manager),
+        GetInteractiveElementsTool(browser_manager=browser_manager),
     ]
