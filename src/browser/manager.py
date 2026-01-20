@@ -1,10 +1,20 @@
-from typing import Optional
+from typing import Optional, List
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Playwright
 from config.settings import settings
 from utils.logger import logger
 
 
-class BrowserManager:
+class Singleton(type):
+    _instances = set()
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
+
+
+class BrowserManager(metaclass=Singleton):
     """
     Manages the lifecycle of a Playwright browser instance.
     Connects to an existing Firefox browser session via CDP (Chrome DevTools Protocol).
@@ -15,6 +25,7 @@ class BrowserManager:
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._current_page: Optional[Page] = None
+        self.start()
     
     def start(self, cdp_url: str = "http://localhost:9222") -> Page:
         """
@@ -149,6 +160,7 @@ class BrowserManager:
         
         try:
             self._current_page = pages[page_index]
+            self._current_page.bring_to_front()
             logger.info(f"Switched to page {page_index}: {self._current_page.url}")
             return self._current_page
         except IndexError:

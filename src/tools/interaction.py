@@ -45,7 +45,10 @@ class ClickElementTool(BaseTool):
     Example: click_element(element_id=5)
     """
     args_schema: type[BaseModel] = ClickElementInput
-    browser_manager: BrowserManager = Field(exclude=True)
+    browser_manager: BrowserManager = Field(
+        exclude=True, 
+        default_factory=BrowserManager,
+    )
     
     def _run(self, element_id: int) -> str:
         """
@@ -107,7 +110,10 @@ class InputTextTool(BaseTool):
     Example: input_text(element_id=3, text="john@example.com")
     """
     args_schema: type[BaseModel] = InputTextInput
-    browser_manager: BrowserManager = Field(exclude=True)
+    browser_manager: BrowserManager = Field(
+        exclude=True, 
+        default_factory=BrowserManager,
+    )
     typing_delay: int = Field(default=50, exclude=True)  # Milliseconds between keystrokes
     
     def _run(self, element_id: int, text: str) -> str:
@@ -176,7 +182,10 @@ class GetElementContextTool(BaseTool):
     Example: get_element_context(element_id=7)
     """
     args_schema: type[BaseModel] = GetElementContextInput
-    browser_manager: BrowserManager = Field(exclude=True)
+    browser_manager: BrowserManager = Field(
+        exclude=True, 
+        default_factory=BrowserManager,
+    )
     
     def _run(self, element_id: int) -> str:
         """
@@ -279,7 +288,10 @@ class GetInteractiveElementsTool(BaseTool):
     Example: get_interactive_elements()
     """
     args_schema: type[BaseModel] = GetInteractiveElementsInput
-    browser_manager: BrowserManager = Field(exclude=True)
+    browser_manager: BrowserManager = Field(
+        exclude=True, 
+        default_factory=BrowserManager,
+    )
     
     def _run(self) -> str:
         """

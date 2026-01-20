@@ -1,9 +1,3 @@
-"""
-Navigation-related tools for the agent.
-Handles URL navigation, Google search, and page transitions.
-"""
-
-from typing import Optional
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from browser.manager import BrowserManager
@@ -34,13 +28,16 @@ class OpenPageTool(BaseTool):
     
     name: str = "open_page"
     description: str = """
-    Open a new page (navigate to a URL) in the current browser session.
-    The URL must include the protocol (http:// or https://).
+    Open a new tab (navigate to a URL) in the current browser session, or activate tab if it has already been opened during the session.
+    The URL must include the protocol (http:// or https://). 
     
     Example: open_page(url="https://www.google.com")
     """
     args_schema: type[BaseModel] = OpenPageInput
-    browser_manager: BrowserManager = Field(exclude=True)
+    browser_manager: BrowserManager = Field(
+        exclude=True, 
+        default_factory=BrowserManager,
+    )
     
     def _run(self, url: str) -> str:
         """
@@ -58,24 +55,29 @@ class OpenPageTool(BaseTool):
         if not page:
             return "Error: Browser not connected."
         
-        # Validate URL format
         if not url.startswith(('http://', 'https://')):
             return "Error: URL must start with http:// or https://"
         
         try:
-            # Navigate to the URL
-            response = page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            
-            # Wait for page to be ready
+            pages_map = {page.url: page for page in self.browser_manager._context.pages}
+
+            if url in pages_map.keys():
+                opened_page = pages_map[url]
+            else:
+                with self.browser_manager._context.expect_page() as new_page_info:
+                    page.evaluate('window.open("about:blank", "_blank")')
+                opened_page = new_page_info.value
+            opened_page.bring_to_front()
+            self.browser_manager.current_page = opened_page
+
+            response = opened_page.goto(url, wait_until="domcontentloaded", timeout=30000)
             page.wait_for_load_state("domcontentloaded")
             
-            # Get page title
             title = page.title()
             current_url = page.url
             
             logger.info(f"Successfully navigated to: {current_url}")
             
-            # Check if navigation was successful
             if response and response.status >= 400:
                 return f"Warning: Page loaded with status {response.status}. URL: {current_url}, Title: '{title}'"
             
@@ -84,50 +86,6 @@ class OpenPageTool(BaseTool):
         except Exception as e:
             logger.error(f"Error navigating to {url}: {e}")
             return f"Error opening page: {str(e)}"
-
-
-class NavigateToURLTool(BaseTool):
-    """
-    Tool for navigating to a specific URL.
-    """
-    
-    name: str = "navigate_to_url"
-    description: str = """
-    Navigate the browser to a specific URL.
-    Use this when you know the exact URL you want to visit.
-    The URL must include the protocol (http:// or https://).
-    
-    Example: navigate_to_url(url="https://www.google.com")
-    """
-    args_schema: type[BaseModel] = NavigateInput
-    browser_manager: BrowserManager = Field(exclude=True)
-    
-    def _run(self, url: str) -> str:
-        """
-        Synchronous version (not used, but required by BaseTool).
-        """
-        raise NotImplementedError("Use async version")
-    
-    async def _arun(self, url: str) -> str:
-        """
-        Navigate to the specified URL.
-        
-        Args:
-            url: The URL to navigate to
-            
-        Returns:
-            Success message with the page title and URL
-        """
-        logger.info(f"Navigating to: {url}")
-        
-        # TODO: Validate URL format
-        # TODO: Get current page from browser manager
-        # TODO: Navigate to URL with timeout
-        # TODO: Wait for page to load (networkidle or domcontentloaded)
-        # TODO: Get page title
-        # TODO: Return success message with title and URL
-        
-        pass
 
 
 class SearchGoogleTool(BaseTool):
@@ -182,7 +140,6 @@ def create_navigation_tools(browser_manager: BrowserManager) -> list[BaseTool]:
         List of navigation tools
     """
     return [
-        NavigateToURLTool(browser_manager=browser_manager),
         SearchGoogleTool(browser_manager=browser_manager),
         OpenPageTool(browser_manager=browser_manager),
     ]

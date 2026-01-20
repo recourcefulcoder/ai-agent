@@ -27,10 +27,7 @@ class AgentState(TypedDict):
     current_url: Optional[str]
 
 
-def create_initial_state(
-    user_request: str, 
-    browser_manager: BrowserManager
-) -> AgentState:
+def create_initial_state(user_request: str) -> AgentState:
     return AgentState(
         user_request=user_request,
         messages=[],
@@ -38,7 +35,7 @@ def create_initial_state(
         current_action=None,
         current_action_index=0,
         execution_results=[],
-        browser_manager=browser_manager,
+        browser_manager=BrowserManager(),
         error_count=0,
         last_error=None,
         pending_confirmation=None,

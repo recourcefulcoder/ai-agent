@@ -17,7 +17,6 @@ console = Console()
 
 def run_task(
     task: str, 
-    browser_manager: BrowserManager, 
     debug: bool = False,
     agent: Optional[CompiledStateGraph] = None,
     initial_state: Optional[AgentState] = None,
@@ -41,7 +40,7 @@ def run_task(
     try:
         if agent is None:
             agent = get_agent()
-            initial_state = create_initial_state(task, browser_manager)
+            initial_state = create_initial_state(task)
         
         # TODO: Stream or invoke the graph with initial state
         # TODO: Handle intermediate outputs (show progress)
@@ -71,7 +70,7 @@ def run_task(
         console.print(f"[red]Error: {str(e)}[/red]")
 
 
-def interactive_mode(browser_manager: BrowserManager, debug: bool = False) -> None:
+def interactive_mode(debug: bool = False) -> None:
     console.print(Panel(
         "[bold cyan]Browser AI Agent - Interactive Mode[/bold cyan]\n\n"
         "Enter tasks in natural language. Type 'exit' or 'quit' to stop.",
@@ -79,7 +78,7 @@ def interactive_mode(browser_manager: BrowserManager, debug: bool = False) -> No
     ))
     
     agent = get_agent()
-    initial_state = create_initial_state(task, browser_manager)
+    initial_state = create_initial_state(task)
     try:
         while True:
             task = console.input("\n[bold cyan]Enter your task:[/bold cyan] ")
@@ -92,14 +91,13 @@ def interactive_mode(browser_manager: BrowserManager, debug: bool = False) -> No
             
             run_task(
                 task, 
-                browser_manager, 
                 debug,
                 agent,
                 initial_state
             )
     
     finally:
-        browser_manager.stop()
+        BrowserManager().stop()
 
 
 @click.command()
@@ -121,14 +119,11 @@ def main(task: str, debug: bool, interactive: bool):
     if not task and not interactive:
         console.print("[red]Error: Either provide a task or use --interactive mode[/red]")
         sys.exit(1)
-    
-    browser_manager = BrowserManager()
-    browser_manager.start()
 
     if interactive:
-        interactive_mode(browser_manager, debug)
+        interactive_mode(debug)
     else:
-        run_task(task, browser_manager, debug)
+        run_task(task, debug)
 
 
 if __name__ == "__main__":
