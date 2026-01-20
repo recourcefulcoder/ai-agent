@@ -1,8 +1,3 @@
-"""
-State schema for the LangGraph agent.
-Defines what information flows between nodes.
-"""
-
 from typing import Annotated, List, Optional
 from typing_extensions import TypedDict
 from langgraph.graph import add_messages

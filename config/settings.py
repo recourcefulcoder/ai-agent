@@ -3,10 +3,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    Application settings loaded from environment variables.
-    """
-    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -41,20 +37,10 @@ class Settings(BaseSettings):
         return self.project_root / "config" / "prompts"
     
     def get_prompt(self, prompt_name: str) -> str:
-        """
-        Load a prompt template from the prompts directory.
-        
-        Args:
-            prompt_name: Name of the prompt file (without .txt extension)
-            
-        Returns:
-            The prompt template content
-        """
         prompt_path = self.prompts_dir / f"{prompt_name}.txt"
         if not prompt_path.exists():
             raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
         return prompt_path.read_text(encoding="utf-8")
 
 
-# Global settings instance
 settings = Settings()

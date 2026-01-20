@@ -1,14 +1,13 @@
-import asyncio
 import sys
-from pathlib import Path
+from typing import Optional
 
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.markdown import Markdown
+from langgraph.graph.state import CompiledStateGraph
 
-from agent.graph import get_agent_graph
-from agent.state import create_initial_state
+from agent.graph import get_agent
+from agent.state import AgentState, create_initial_state
 from browser.manager import BrowserManager
 from config.settings import settings
 from utils.logger import setup_logger, logger
@@ -16,7 +15,13 @@ from utils.logger import setup_logger, logger
 console = Console()
 
 
-async def run_task(task: str, debug: bool = False) -> None:
+def run_task(
+    task: str, 
+    browser_manager: BrowserManager, 
+    debug: bool = False,
+    agent: Optional[CompiledStateGraph] = None,
+    initial_state: Optional[AgentState] = None,
+) -> None:
     """
     Run a single task with the agent.
     
@@ -33,26 +38,17 @@ async def run_task(task: str, debug: bool = False) -> None:
         border_style="cyan"
     ))
     
-    browser_manager = BrowserManager()
-    
     try:
-        await browser_manager.start()
-        console.print("[green]✓[/green] Browser started")
-        
-        graph = get_agent_graph()
-        
-        initial_state = create_initial_state(task)
-        
-        # Run the agent
-        console.print("[yellow]→[/yellow] Planning and executing task...")
+        if agent is None:
+            agent = get_agent()
+            initial_state = create_initial_state(task)
         
         # TODO: Stream or invoke the graph with initial state
         # TODO: Handle intermediate outputs (show progress)
         # TODO: Get final state
         
-        final_state = None  # TODO: Replace with actual final state
+        final_state = None  
         
-        # Display results
         if final_state and final_state.get("success"):
             console.print(Panel(
                 final_state.get("final_message", "Task completed!"),
@@ -73,25 +69,17 @@ async def run_task(task: str, debug: bool = False) -> None:
     except Exception as e:
         logger.exception("Error running task")
         console.print(f"[red]Error: {str(e)}[/red]")
-    
-    finally:
-        await browser_manager.stop()
-        console.print("[green]✓[/green] Browser closed")
 
 
-async def interactive_mode() -> None:
-    """
-    Run the agent in interactive mode.
-    """
+def interactive_mode(browser_manager: BrowserManager, debug: bool = False) -> None:
     console.print(Panel(
         "[bold cyan]Browser AI Agent - Interactive Mode[/bold cyan]\n\n"
         "Enter tasks in natural language. Type 'exit' or 'quit' to stop.",
         border_style="cyan"
     ))
     
-    browser_manager = BrowserManager()
-    await browser_manager.start()
-    
+    agent = get_agent()
+    initial_state = create_initial_state(task)
     try:
         while True:
             task = console.input("\n[bold cyan]Enter your task:[/bold cyan] ")
@@ -102,13 +90,16 @@ async def interactive_mode() -> None:
             if not task.strip():
                 continue
             
-            # TODO: Run task with the agent
-            # TODO: Display results
-            
-            console.print("[yellow]Interactive mode not fully implemented yet[/yellow]")
+            run_task(
+                task, 
+                browser_manager, 
+                debug,
+                agent,
+                initial_state
+            )
     
     finally:
-        await browser_manager.stop()
+        browser_manager.stop()
 
 
 @click.command()
@@ -131,10 +122,13 @@ def main(task: str, debug: bool, interactive: bool):
         console.print("[red]Error: Either provide a task or use --interactive mode[/red]")
         sys.exit(1)
     
+    browser_manager = BrowserManager()
+    browser_manager.start()
+
     if interactive:
-        asyncio.run(interactive_mode())
+        interactive_mode(browser_manager, debug)
     else:
-        asyncio.run(run_task(task, debug))
+        run_task(task, browser_manager, debug)
 
 
 if __name__ == "__main__":

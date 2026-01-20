@@ -1,8 +1,3 @@
-"""
-LangGraph agent definition.
-Defines the workflow graph with nodes and conditional edges.
-"""
-
 from typing import Literal
 from langgraph.graph import StateGraph, END
 from agent.state import AgentState
@@ -124,10 +119,8 @@ def create_agent_graph() -> StateGraph:
     """
     logger.info("Creating agent graph...")
     
-    # Create the graph
     workflow = StateGraph(AgentState)
     
-    # Add nodes
     workflow.add_node("plan", plan_task_node)
     workflow.add_node("execute", execute_action_node)
     workflow.add_node("verify", verify_action_node)
@@ -135,13 +128,10 @@ def create_agent_graph() -> StateGraph:
     workflow.add_node("confirm", seek_confirmation_node)
     workflow.add_node("finalize", finalize_node)
     
-    # Define edges
     workflow.set_entry_point("plan")
     
-    # After planning, start executing
     workflow.add_edge("plan", "execute")
     
-    # After execution, check if confirmation needed
     workflow.add_conditional_edges(
         "execute",
         should_seek_confirmation,
@@ -151,10 +141,8 @@ def create_agent_graph() -> StateGraph:
         }
     )
     
-    # After confirmation, proceed to verify
     workflow.add_edge("confirm", "verify")
     
-    # After verification, check if error occurred
     workflow.add_conditional_edges(
         "verify",
         should_handle_error,
@@ -164,7 +152,6 @@ def create_agent_graph() -> StateGraph:
         }
     )
     
-    # After error handling, decide retry or abort
     workflow.add_conditional_edges(
         "error",
         should_retry_or_abort,
@@ -186,27 +173,18 @@ def create_agent_graph() -> StateGraph:
         }
     )
     
-    # Finalize leads to END
     workflow.add_edge("finalize", END)
     
-    # Compile the graph
     graph = workflow.compile()
     
     logger.info("Agent graph created successfully")
     return graph
 
 
-# Global graph instance
 agent_graph = None
 
 
-def get_agent_graph() -> StateGraph:
-    """
-    Get or create the agent graph singleton.
-    
-    Returns:
-        Compiled agent graph
-    """
+def get_agent() -> StateGraph:
     global agent_graph
     if agent_graph is None:
         agent_graph = create_agent_graph()

@@ -42,6 +42,11 @@ cp .env.example .env
 ### Usage
 
 ```bash
+# Run firefox browser in debug modefor interactive agent mode
+firefox --remote-debugging-port=9222
+```
+
+```bash
 # Run the agent
 python src/main.py "Check my calendar and schedule a meeting with Sara for next weekend"
 

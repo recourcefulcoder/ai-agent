@@ -1,5 +1,5 @@
 from typing import Optional
-from playwright.async_api import Browser, BrowserContext, Page
+from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Playwright
 from config.settings import settings
 from utils.logger import logger
 
@@ -7,66 +7,159 @@ from utils.logger import logger
 class BrowserManager:
     """
     Manages the lifecycle of a Playwright browser instance.
+    Connects to an existing Firefox browser session via CDP (Chrome DevTools Protocol).
     """
     
     def __init__(self):
-        self._playwright = None
+        self._playwright: Optional[Playwright] = None
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
     
-    async def start(self) -> Page:
+    def start(self, cdp_url: str = "http://localhost:9222") -> Page:
         """
-        Start the browser and return the main page.
+        Connect to an existing Firefox browser and return the active page.
         
-        Returns:
-            The main browser page
-        """
-        logger.info("Starting browser...")
+        To start Firefox with remote debugging enabled, use:
+        firefox --remote-debugging-port=9222
         
-        # TODO: Initialize Playwright
-        # TODO: Launch browser with configured settings
-        # TODO: Create browser context
-        # TODO: Create initial page
-        # TODO: Set default timeout
-        # TODO: Set viewport size
-        
-        logger.info(f"Browser started (headless={settings.browser_headless})")
-        return self._page
-    
-    async def stop(self) -> None:
-        """
-        Stop the browser and clean up resources.
-        """
-        logger.info("Stopping browser...")
-        
-        # TODO: Close page
-        # TODO: Close context
-        # TODO: Close browser
-        # TODO: Stop playwright
-        
-        logger.info("Browser stopped")
-    
-    async def new_page(self) -> Page:
-        """
-        Create a new page in the current browser context.
-        
-        Returns:
-            New browser page
-        """
-        # TODO: Create new page in existing context
-        # TODO: Set default timeout for new page
-        pass
-    
-    async def close_page(self, page: Page) -> None:
-        """
-        Close a specific page.
+        Or for a specific profile:
+        firefox --remote-debugging-port=9222 --profile /path/to/profile
         
         Args:
-            page: The page to close
+            cdp_url: The CDP (Chrome DevTools Protocol) endpoint URL.
+                     Default is http://localhost:9222
+        
+        Returns:
+            The currently active browser page
+            
+        Raises:
+            Exception: If connection fails or no pages are available
         """
-        # TODO: Close the specified page
-        pass
+        logger.info(f"Connecting to existing Firefox browser at {cdp_url}...")
+        
+        try:
+            self._playwright = sync_playwright().start()
+            logger.debug("Playwright initialized")
+            
+            self._browser = self._playwright.chromium.connect_over_cdp(cdp_url)
+            logger.info("Successfully connected to browser")
+            
+            contexts = self._browser.contexts
+            
+            if not contexts:
+                logger.warning("No browser contexts found, creating new context")
+                self._context = self._browser.new_context(
+                    viewport={'width': 1280, 'height': 720}
+                )
+            else:
+                self._context = contexts[0]
+                logger.debug(f"Using existing browser context with {len(self._context.pages)} pages")
+            
+            pages = self._context.pages
+            
+            if not pages:
+                self._page = self._context.new_page()
+            else:
+                self._page = pages[-1]
+            
+            self._page.set_default_timeout(settings.browser_timeout)
+            
+            logger.info(f"Browser connection established. Current URL: {self._page.url}")
+            
+            return self._page
+            
+        except Exception as e:
+            logger.error(f"Failed to connect to browser: {e}")
+            self._cleanup()
+            raise Exception(f"Could not connect to browser at {cdp_url}. "
+                          f"Make sure Firefox is running with: firefox --remote-debugging-port=9222") from e
+    
+    def stop(self) -> None:      
+        self._cleanup()
+        logger.info("Successfully disconnected from browser")
+    
+    def _cleanup(self) -> None:
+        if self._context:
+            try:
+                self._context = None
+            except Exception as e:
+                logger.warning(f"Error releasing context: {e}")
+        
+        if self._browser:
+            try:
+                self._browser.close()
+                logger.debug("Disconnected from browser")
+                self._browser = None
+            except Exception as e:
+                logger.warning(f"Error disconnecting from browser: {e}")
+        
+        if self._playwright:
+            try:
+                self._playwright.stop()
+                logger.debug("Playwright stopped")
+                self._playwright = None
+            except Exception as e:
+                logger.warning(f"Error stopping Playwright: {e}")
+        
+        self._page = None
+    
+    def new_page(self) -> Page:
+        if not self._context:
+            raise Exception("Browser not connected. Call start() first.")
+        
+        logger.info("Creating new page...")
+        page = self._context.new_page()
+        page.set_default_timeout(settings.browser_timeout)
+        
+        self._page = page
+        
+        logger.info(f"New page created: {page.url}")
+        return page
+    
+    def close_page(self, page: Page) -> None:
+        if not page:
+            return
+        
+        logger.info(f"Closing page: {page.url}")
+        
+        try:
+            page.close()
+            if self._page == page:
+                if self._context and self._context.pages:
+                    self._page = self._context.pages[-1]
+                    logger.debug(f"Switched to page: {self._page.url}")
+                else:
+                    self._page = None
+                    logger.debug("No pages remaining")
+                    
+        except Exception as e:
+            logger.error(f"Error closing page: {e}")
+    
+    def switch_to_page(self, page_index: int = -1) -> Optional[Page]:
+        if not self._context:
+            logger.warning("Browser not connected")
+            return None
+        
+        pages = self._context.pages
+        
+        if not pages:
+            logger.warning("No pages available")
+            return None
+        
+        try:
+            self._page = pages[page_index]
+            logger.info(f"Switched to page {page_index}: {self._page.url}")
+            return self._page
+        except IndexError:
+            logger.error(f"Invalid page index: {page_index}")
+            return None
+    
+    def get_all_pages(self) -> list[Page]:
+        if not self._context:
+            return []
+        
+        return self._context.pages
     
     @property
     def current_page(self) -> Optional[Page]:
@@ -77,15 +170,18 @@ class BrowserManager:
     def current_url(self) -> Optional[str]:
         """Get the URL of the current page."""
         if self._page:
-            # TODO: Return current page URL
-            pass
+            return self._page.url
         return None
     
-    async def __aenter__(self):
+    @property
+    def is_connected(self) -> bool:
+        return self._browser is not None and self._page is not None
+    
+    def __enter__(self):
         """Context manager entry."""
-        await self.start()
+        self.start()
         return self
     
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
-        await self.stop()
+        self.stop()
