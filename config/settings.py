@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     browser_timeout: int = 30000
     
     max_retries: int = 3  # max agent task retires
+    context_request_depth: int = 5  # defines how deep into 
+    # parent blocks can agent go, requesting additional context on an element.
     require_confirmation_for_sensitive: bool = True
     
     log_level: str = "INFO"
@@ -28,12 +30,10 @@ class Settings(BaseSettings):
     
     @property
     def project_root(self) -> Path:
-        """Get the project root directory."""
         return Path(__file__).parent.parent
     
     @property
     def prompts_dir(self) -> Path:
-        """Get the prompts directory."""
         return self.project_root / "config" / "prompts"
     
     def get_prompt(self, prompt_name: str) -> str:

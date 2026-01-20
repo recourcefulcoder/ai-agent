@@ -1,8 +1,8 @@
-from typing import Optional
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from browser.manager import BrowserManager
 from browser.locator import ElementLocator
+from config.settings import settings
 from utils.logger import logger
 from services.tools_cache_manager import get_elements_cache
 
@@ -69,7 +69,6 @@ class ClickElementTool(BaseTool):
         selector = element_info['selector']
         
         try:
-            # Locate the element
             element = page.locator(selector).first
             
             # Check if element exists
@@ -104,7 +103,6 @@ class InputTextTool(BaseTool):
     description: str = """
     Type text into an input field, textarea, or other text-accepting element.
     You must first use 'get_interactive_elements' to find input fields and their IDs.
-    Text is typed letter-by-letter with a visible delay.
     
     Example: input_text(element_id=3, text="john@example.com")
     """
@@ -130,7 +128,6 @@ class InputTextTool(BaseTool):
         if not page:
             return "Error: Browser not connected."
         
-        # Get element info from cache
         if element_id not in cache.keys():
             return f"Error: Element ID {element_id} not found. Use 'get_interactive_elements' first."
         
@@ -168,17 +165,13 @@ class InputTextTool(BaseTool):
             return f"Error typing text: {str(e)}"
 
 
-class GetElementContextTool(BaseTool):
-    """
-    Tool for getting contextual information about an element.
-    Returns information about parent elements up to the first text-containing block or 5 levels up.
-    """
-    
+class GetElementContextTool(BaseTool):   
     name: str = "get_element_context"
-    description: str = """
+    description: str = f"""
     Get contextual information about an element by examining its parent elements.
     This helps understand what section of the page the element belongs to.
-    Returns information about parent elements up to the first block containing text or 5 levels up.
+    Returns information about parent elements up to the first block containing text or {settings.context_request_depth} levels up. 
+    If you didn't manage to understand element purpose after calling this method, you may use it once more; if you still fail to understand element purpose consider it to be not valuable for your task.
     
     Example: get_element_context(element_id=7)
     """
@@ -214,7 +207,9 @@ class GetElementContextTool(BaseTool):
             if element.count() == 0:
                 return "Error: Element not found on the page."
             
-            # Get parent hierarchy information
+            text_substring_size = 200  # defines how much symbols of context text should 
+            # be passed to an agent
+
             context_info = element.evaluate('''(el) => {
                 const context = [];
                 let current = el.parentElement;
@@ -223,18 +218,17 @@ class GetElementContextTool(BaseTool):
                 
                 while (current && level < maxLevels) {
                     const text = current.innerText?.trim() || '';
-                    const hasText = text.length > 0 && text.length < 500;
+                    const hasText = text.length > 0;
                     
                     context.push({
                         level: level + 1,
                         tagName: current.tagName.toLowerCase(),
                         id: current.id || null,
                         className: current.className || null,
-                        text: hasText ? text.substring(0, 200) : null,
+                        text: hasText ? text.substring(0, 300) : null,
                         hasText: hasText
                     });
                     
-                    // Stop if we found a parent with text content
                     if (hasText) break;
                     
                     current = current.parentElement;
@@ -258,7 +252,7 @@ class GetElementContextTool(BaseTool):
                     class_str = ctx['className'][:50]
                     result += f" class='{class_str}...'" if len(ctx['className']) > 50 else f" class='{ctx['className']}'"
                 if ctx['text']:
-                    result += f"\n  Text: {ctx['text'][:150]}..."
+                    result += f"\n  Text: {ctx['text'][:text_substring_size]}..."
                 if ctx['hasText']:
                     result += "\n  (Stopped: found text-containing block)"
             
@@ -326,39 +320,7 @@ class GetInteractiveElementsTool(BaseTool):
                     by_type[elem_type] = []
                 by_type[elem_type].append(elem)
             
-            # Format each group
-            for elem_type, type_elements in by_type.items():
-                result += f"\n{elem_type.upper()} ({len(type_elements)}):\n"
-                result += "-" * 50 + "\n"
-                
-                for elem in type_elements[:10]:  # Limit to first 10 per type
-                    result += f"  ID {elem['id']}: "
-                    
-                    # Show label or contents
-                    if elem.get('label'):
-                        result += f"'{elem['label']}'"
-                    elif elem.get('aria_label'):
-                        result += f"'{elem['aria_label']}'"
-                    elif elem.get('placeholder'):
-                        result += f"[{elem['placeholder']}]"
-                    elif elem.get('contents'):
-                        content = elem['contents'][:50]
-                        result += f"'{content}...'" if len(elem['contents']) > 50 else f"'{content}'"
-                    else:
-                        result += "(no label)"
-                    
-                    # Add visibility status
-                    if not elem.get('is_visible', True):
-                        result += " [HIDDEN]"
-                    if not elem.get('is_enabled', True):
-                        result += " [DISABLED]"
-                    
-                    result += "\n"
-                
-                if len(type_elements) > 10:
-                    result += f"  ... and {len(type_elements) - 10} more\n"
-            
-            result += f"\nTotal: {len(elements)} elements available for interaction"
+            result += str(by_type) + f"\nTotal: {len(elements)} elements available for interaction"
             
             logger.info(f"Cached {len(elements)} elements")
             return result

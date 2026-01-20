@@ -17,18 +17,18 @@ class ElementsCacheManager:
     
     def __init__(self):
         if not hasattr(self, '_cache'):
-            self._cache: Dict[int, Dict[str, Any]] = {}
+            self._cache: Dict[str, Dict[str, Any]] = {}
     
-    def get_cache(self) -> Dict[int, Dict[str, Any]]:
+    def get_cache(self) -> Dict[str, Dict[str, Any]]:
         return self._cache
     
-    def set_cache(self, cache: Dict[int, Dict[str, Any]]) -> None:
+    def set_cache(self, cache: Dict[str, Dict[str, Any]]) -> None:
         self._cache = cache
     
     def clear_cache(self) -> None:
         self._cache.clear()
     
-    def get_element(self, element_id: int) -> Optional[Dict[str, Any]]:
+    def get_element(self, element_id: str) -> Optional[Dict[str, Any]]:
         return self._cache.get(element_id)
 
 

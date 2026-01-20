@@ -14,7 +14,7 @@ class BrowserManager:
         self._playwright: Optional[Playwright] = None
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
-        self._page: Optional[Page] = None
+        self._current_page: Optional[Page] = None
     
     def start(self, cdp_url: str = "http://localhost:9222") -> Page:
         """
@@ -59,15 +59,15 @@ class BrowserManager:
             pages = self._context.pages
             
             if not pages:
-                self._page = self._context.new_page()
+                self._current_page = self._context.new_page()
             else:
-                self._page = pages[-1]
+                self._current_page = pages[-1]
             
-            self._page.set_default_timeout(settings.browser_timeout)
+            self._current_page.set_default_timeout(settings.browser_timeout)
             
-            logger.info(f"Browser connection established. Current URL: {self._page.url}")
+            logger.info(f"Browser connection established. Current URL: {self._current_page.url}")
             
-            return self._page
+            return self._current_page
             
         except Exception as e:
             logger.error(f"Failed to connect to browser: {e}")
@@ -102,7 +102,7 @@ class BrowserManager:
             except Exception as e:
                 logger.warning(f"Error stopping Playwright: {e}")
         
-        self._page = None
+        self._current_page = None
     
     def new_page(self) -> Page:
         if not self._context:
@@ -112,7 +112,7 @@ class BrowserManager:
         page = self._context.new_page()
         page.set_default_timeout(settings.browser_timeout)
         
-        self._page = page
+        self._current_page = page
         
         logger.info(f"New page created: {page.url}")
         return page
@@ -125,12 +125,12 @@ class BrowserManager:
         
         try:
             page.close()
-            if self._page == page:
+            if self._current_page == page:
                 if self._context and self._context.pages:
-                    self._page = self._context.pages[-1]
-                    logger.debug(f"Switched to page: {self._page.url}")
+                    self._current_page = self._context.pages[-1]
+                    logger.debug(f"Switched to page: {self._current_page.url}")
                 else:
-                    self._page = None
+                    self._current_page = None
                     logger.debug("No pages remaining")
                     
         except Exception as e:
@@ -148,9 +148,9 @@ class BrowserManager:
             return None
         
         try:
-            self._page = pages[page_index]
-            logger.info(f"Switched to page {page_index}: {self._page.url}")
-            return self._page
+            self._current_page = pages[page_index]
+            logger.info(f"Switched to page {page_index}: {self._current_page.url}")
+            return self._current_page
         except IndexError:
             logger.error(f"Invalid page index: {page_index}")
             return None
@@ -163,19 +163,17 @@ class BrowserManager:
     
     @property
     def current_page(self) -> Optional[Page]:
-        """Get the current active page."""
-        return self._page
+        return self._current_page
     
     @property
     def current_url(self) -> Optional[str]:
-        """Get the URL of the current page."""
-        if self._page:
-            return self._page.url
+        if self._current_page:
+            return self._current_page.url
         return None
     
     @property
     def is_connected(self) -> bool:
-        return self._browser is not None and self._page is not None
+        return self._browser is not None and self._current_page is not None
     
     def __enter__(self):
         """Context manager entry."""
