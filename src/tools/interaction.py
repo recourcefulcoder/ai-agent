@@ -283,7 +283,7 @@ class GetInteractiveElementsTool(BaseTool):
     name: str = "get_interactive_elements"
     description: str = """
     Get a list of all interactive elements on the current page.
-    Returns information about buttons, links, inputs, and other clickable elements.
+    Returns information about buttons, links, inputs, and other clickable HTML elements of the page as JSON dictionary, where keys are element's attributes (index, name, value (meaning inside value), etc.), and values are values of those attributes.
     Each element gets a unique ID that can be used with other tools like click_element or input_text.
     
     Use this tool first to understand what elements are available on the page.

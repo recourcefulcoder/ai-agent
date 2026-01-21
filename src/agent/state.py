@@ -1,14 +1,18 @@
 from typing import Annotated, List, Optional
 from typing_extensions import TypedDict
+
 from langgraph.graph import add_messages
+from langchain_core.messages import SystemMessage,AIMessage, HumanMessage
 from models.task import TaskPlan, ExecutionResult, BrowserAction
 from browser.manager import BrowserManager
+
+from config.settings import settings
 
 
 class AgentState(TypedDict):
     user_request: str
     # Messages exchanged with the LLM (for reasoning)
-    messages: Annotated[List, add_messages]
+    messages: Annotated[List[AIMessage | SystemMessage | HumanMessage], add_messages]
     task_plan: Optional[TaskPlan]
     current_action: Optional[BrowserAction]
     current_action_index: int
@@ -28,9 +32,10 @@ class AgentState(TypedDict):
 
 
 def create_initial_state(user_request: str) -> AgentState:
+    sys_prompt = SystemMessage(content=settings.get_prompt("main_agent"), id=1)
     return AgentState(
         user_request=user_request,
-        messages=[],
+        messages=[sys_prompt],
         task_plan=None,
         current_action=None,
         current_action_index=0,

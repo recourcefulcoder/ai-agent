@@ -1,10 +1,5 @@
-"""
-Node implementations for the LangGraph agent.
-Each node represents a step in the task execution workflow.
-"""
-
 from typing import Dict, Any
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
 from agent.state import AgentState
 from models.task import TaskPlan, BrowserAction, ExecutionResult
 from tools.interaction import create_interaction_tools
