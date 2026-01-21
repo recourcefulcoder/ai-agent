@@ -203,10 +203,7 @@ def tool_node(state: AgentState):
         copied straight up from docs
     """
     result = []
-    tools = (
-        create_navigation_tools(state.browser_manager) + 
-        create_interaction_tools(state.browser_manager)
-    )
+    tools = create_navigation_tools() + create_interaction_tools()
     tools_by_name = {tool.name: tool for tool in tools}
     
     for tool_call in state["messages"][-1].tool_calls:

@@ -89,13 +89,11 @@ class ElementLocator:
                 "aria_label": aria-label attribute if exists,
                 "role": ARIA role if exists,
                 "selector": CSS selector to locate the element,
-                "is_visible": whether element is currently visible,
                 "is_enabled": whether element is enabled/clickable,
                 "tag_name": HTML tag name,
                 "href": link that specifies element's destination on click,
                 "title": element title if exists,
-                "input_type": type of input if element is input,
-                
+                "input_type": type of input if element is input,   
             }
         """
         logger.info("Analyzing page for interactive elements...")
@@ -115,7 +113,6 @@ class ElementLocator:
                         element_id_counter += 1
                         
                         tag_name = element.evaluate('el => el.tagName.toLowerCase()')
-                        is_visible = element.is_visible()
                         is_enabled = element.is_enabled() if tag_name in ['input', 'button', 'select', 'textarea'] else True
                         
                         contents = ""
@@ -173,7 +170,6 @@ class ElementLocator:
                             "aria_label": attributes.get('ariaLabel'),
                             "role": attributes.get('role'),
                             "selector": selector_str,
-                            "is_visible": is_visible,
                             "is_enabled": is_enabled,
                             "name": attributes.get('name'),
                             "href": attributes.get('href'),

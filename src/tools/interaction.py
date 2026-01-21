@@ -11,15 +11,15 @@ from services.tools_cache_manager import get_elements_cache
 
 class ClickElementInput(BaseModel):
     """Input schema for clicking an element."""
-    element_id: int = Field(
-        description="The ID of the element to click (from the interactive elements list)"
+    element_selector: str = Field(
+        description="The unique selector of the element to click (from the interactive elements list)"
     )
 
 
 class InputTextInput(BaseModel):
     """Input schema for typing text into an element."""
-    element_id: int = Field(
-        description="The ID of the element to type into (from the interactive elements list)"
+    element_selector: str = Field(
+        description="The unique selector of the element to type into (from the interactive elements list)"
     )
     text: str = Field(
         description="The text to type into the element"
@@ -28,14 +28,18 @@ class InputTextInput(BaseModel):
 
 class GetElementContextInput(BaseModel):
     """Input schema for getting element context."""
-    element_id: int = Field(
-        description="The ID of the element to get context for"
+    element_selector: str = Field(
+        description="The unique selector of the element to get context for"
     )
 
 
 class GetInteractiveElementsInput(BaseModel):
     """Input schema for getting all interactive elements on the page."""
-    pass  # No arguments needed
+    pass  
+
+
+class GetInformativeElementsInput(BaseModel):
+    pass
 
 
 class ClickElementTool(BaseTool):
@@ -43,9 +47,9 @@ class ClickElementTool(BaseTool):
     description: str = """
     Click on an interactive element on the page.
     You must first use 'get_interactive_elements' to get the list of elements and their IDs.
-    Then use this tool with the element's ID to click it.
+    Then use this tool with the element's unique selector value to click it.
     
-    Example: click_element(element_id=5)
+    Example: click_element(element_selector="#button_id")
     """
     args_schema: type[BaseModel] = ClickElementInput
     browser_manager: BrowserManager = Field(
@@ -53,50 +57,48 @@ class ClickElementTool(BaseTool):
         default_factory=BrowserManager,
     )
     
-    def _run(self, element_id: int) -> str:
+    def _run(self, element_selector: str) -> str:
         """
         Click on the element with the given ID.
         
         Args:
-            element_id: The ID of the element to click
+            element_selector: The ID of the element to click
             
         Returns:
             Success or error message
         """        
         page = self.browser_manager.current_page
-        cache = get_elements_cache().get_cache()
+        
         if not page:
             return "Error: Browser not connected. Use the browser manager to connect first."
         
-        if element_id not in cache.keys():
-            return f"Error: Element ID {element_id} not found. Use 'get_interactive_elements' first to get the list of elements."
+        cache = get_elements_cache().get_cache(page.url)
+
+        if cache is None or element_selector not in cache.keys():
+            return f"Error: Element ID {element_selector} not found. Use 'get_interactive_elements' first to get the list of elements."
         
-        element_info = cache[element_id]
+        element_info = cache.get(element_selector)
         selector = element_info['selector']
         
         try:
             element = page.locator(selector).first
             
-            # Check if element exists
             if element.count() == 0:
                 return f"Error: Element with selector '{selector}' not found on the page. The page may have changed."
             
-            # Check if element is visible
             if not element.is_visible():
-                logger.warning(f"Element {element_id} is not visible, attempting to scroll into view")
+                logger.warning(f"Element {element_selector} is not visible, attempting to scroll into view")
                 element.scroll_into_view_if_needed()
             
-            # Click the element
             element.click()
             logger.info(f"Successfully clicked element: {element_info.get('type')} - {element_info.get('contents', 'N/A')}")
             
-            # Wait a bit for any page changes
             time.sleep(0.5)
             
             return f"Successfully clicked: {element_info.get('type')} '{element_info.get('label') or element_info.get('contents', 'element')}'"
             
         except Exception as e:
-            logger.error(f"Error clicking element {element_id}: {e}")
+            logger.error(f"Error clicking element {element_selector}: {e}")
             return f"Error clicking element: {str(e)}"
 
 
@@ -108,9 +110,9 @@ class InputTextTool(BaseTool):
     name: str = "input_text"
     description: str = """
     Type text into an input field, textarea, or other text-accepting element.
-    You must first use 'get_interactive_elements' to find input fields and their IDs.
+    You must first use 'get_interactive_elements' to find input fields and their unique selectors.
     
-    Example: input_text(element_id=3, text="john@example.com")
+    Example: input_text(element_selector="#input_element", text="john@example.com")
     """
     args_schema: type[BaseModel] = InputTextInput
     browser_manager: BrowserManager = Field(
@@ -119,28 +121,30 @@ class InputTextTool(BaseTool):
     )
     typing_delay: int = Field(default=50, exclude=True)  # Milliseconds between keystrokes
     
-    def _run(self, element_id: int, text: str) -> str:
+    def _run(self, element_selector: str, text: str) -> str:
         """
         Type text into the element with the given ID.
         
         Args:
-            element_id: The ID of the element to type into
+            element_selector: The ID of the element to type into
             text: The text to type
             
         Returns:
             Success or error message
         """
-        logger.info(f"Typing text into element {element_id}: '{text[:50]}...'")
+        logger.info(f"Typing text into element {element_selector}: '{text[:50]}...'")
         
         page = self.browser_manager.current_page
-        cache = get_elements_cache().get_cache()
+        
         if not page:
             return "Error: Browser not connected."
         
-        if element_id not in cache.keys():
-            return f"Error: Element ID {element_id} not found. Use 'get_interactive_elements' first."
+        cache = get_elements_cache().get_cache(page.url)
+
+        if cache is None or element_selector not in cache.keys():
+            return f"Error: Element ID {element_selector} not found. Use 'get_interactive_elements' first."
         
-        element_info = cache[element_id]
+        element_info = cache.get(element_selector)
         selector = element_info['selector']
         
         try:
@@ -150,19 +154,15 @@ class InputTextTool(BaseTool):
             if element.count() == 0:
                 return f"Error: Element not found on the page."
             
-            # Scroll into view if needed
             if not element.is_visible():
                 element.scroll_into_view_if_needed()
             
-            # Click to focus the element first
             element.click()
             time.sleep(0.2)
             
-            # Clear existing text if any
             element.fill("")
             time.sleep(0.1)
             
-            # Type the text with delay (letter-by-letter)
             element.type(text, delay=self.typing_delay)
             
             logger.info(f"Successfully typed text into: {element_info.get('type')}")
@@ -170,7 +170,7 @@ class InputTextTool(BaseTool):
             return f"Successfully typed text into: {element_info.get('label') or element_info.get('type', 'element')}"
             
         except Exception as e:
-            logger.error(f"Error typing into element {element_id}: {e}")
+            logger.error(f"Error typing into element {element_selector}: {e}")
             return f"Error typing text: {str(e)}"
 
 
@@ -182,7 +182,7 @@ class GetElementContextTool(BaseTool):
     Returns information about parent elements up to the first block containing text or {settings.context_request_depth} levels up. 
     If you didn't manage to understand element purpose after calling this method, you may use it once more; if you still fail to understand element purpose consider it to be not valuable for your task.
     
-    Example: get_element_context(element_id=7)
+    Example: get_element_context(element_selector=7)
     """
     args_schema: type[BaseModel] = GetElementContextInput
     browser_manager: BrowserManager = Field(
@@ -190,27 +190,27 @@ class GetElementContextTool(BaseTool):
         default_factory=BrowserManager,
     )
     
-    def _run(self, element_id: int) -> str:
+    def _run(self, element_selector: int) -> str:
         """
         Get contextual information about the element.
         
         Args:
-            element_id: The ID of the element to get context for
+            element_selector: The ID of the element to get context for
             
         Returns:
             Context information as a formatted string
         """
-        logger.info(f"Getting context for element {element_id}")
+        logger.info(f"Getting context for element {element_selector}")
         
         page = self.browser_manager.current_page
         cache = get_elements_cache().get_cache()
         if not page:
             return "Error: Browser not connected."
         
-        if element_id not in cache.keys():
-            return f"Error: Element ID {element_id} not found."
+        if element_selector not in cache.keys():
+            return f"Error: Element ID {element_selector} not found."
         
-        element_info = cache[element_id]
+        element_info = cache[element_selector]
         selector = element_info['selector']
         
         try:
@@ -251,7 +251,7 @@ class GetElementContextTool(BaseTool):
             }''')
             
             # Format the context information
-            result = f"Context for element {element_id} ({element_info.get('type')}):\n\n"
+            result = f"Context for element {element_selector} ({element_info.get('type')}):\n\n"
             result += f"Element: {element_info.get('label') or element_info.get('contents', 'N/A')}\n"
             result += f"Selector: {selector}\n\n"
             result += "Parent hierarchy:\n"
@@ -271,7 +271,7 @@ class GetElementContextTool(BaseTool):
             return result
             
         except Exception as e:
-            logger.error(f"Error getting context for element {element_id}: {e}")
+            logger.error(f"Error getting context for element {element_selector}: {e}")
             return f"Error getting element context: {str(e)}"
 
 
@@ -413,7 +413,7 @@ class GetInformativeElementsTool(BaseTool):
             return f"Error getting interactive elements: {str(e)}"
 
 
-def create_interaction_tools(browser_manager: BrowserManager) -> list[BaseTool]:
+def create_interaction_tools() -> list[BaseTool]:
     """
     Create all interaction tools.
     

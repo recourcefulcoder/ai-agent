@@ -126,7 +126,7 @@ class SearchGoogleTool(BaseTool):
         pass
 
 
-def create_navigation_tools(browser_manager: BrowserManager) -> list[BaseTool]:
+def create_navigation_tools() -> list[BaseTool]:
     """
     Create all navigation-related tools.
     
