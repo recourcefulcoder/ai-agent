@@ -148,7 +148,7 @@ def create_agent_graph() -> StateGraph:
         should_handle_error,
         {
             "error": "error",
-            "continue": "check_done",  # We'll add this virtual node
+            "continue": "continue_check",
         }
     )
     
@@ -161,11 +161,11 @@ def create_agent_graph() -> StateGraph:
         }
     )
     
-    # Virtual decision point: are we done with all actions?
-    # (In practice, we'll use should_continue_execution after verify)
-    # Simplified: After verify, check if more actions
+    # Add a dummy node for continue_check that just passes through
+    workflow.add_node("continue_check", lambda state: state)
+    
     workflow.add_conditional_edges(
-        "verify",
+        "continue_check",
         should_continue_execution,
         {
             "execute": "execute",

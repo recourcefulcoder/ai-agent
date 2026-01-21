@@ -3,6 +3,8 @@ from typing import List, Dict
 
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
+from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
+
 from browser.manager import BrowserManager
 from browser.locator import ElementLocator
 from config.settings import settings
@@ -48,6 +50,7 @@ class ClickElementTool(BaseTool):
     Click on an interactive element on the page.
     You must first use 'get_interactive_elements' to get the list of elements and their IDs.
     Then use this tool with the element's unique selector value to click it.
+    This tool returns update on browser changes, if any occured; it may be opening of new window, or new pop-up window appeared, or any changes on the page itself.
     
     Example: click_element(element_selector="#button_id")
     """
@@ -62,7 +65,7 @@ class ClickElementTool(BaseTool):
         Click on the element with the given ID.
         
         Args:
-            element_selector: The ID of the element to click
+            element_selector: The unqie selector of the element to click
             
         Returns:
             Success or error message
@@ -75,7 +78,7 @@ class ClickElementTool(BaseTool):
         cache = get_elements_cache().get_cache(page.url)
 
         if cache is None or element_selector not in cache.keys():
-            return f"Error: Element ID {element_selector} not found. Use 'get_interactive_elements' first to get the list of elements."
+            return f"Error: Element with selector {element_selector} not found. Use 'get_interactive_elements' first to get the list of elements."
         
         element_info = cache.get(element_selector)
         selector = element_info['selector']
@@ -89,13 +92,31 @@ class ClickElementTool(BaseTool):
             if not element.is_visible():
                 logger.warning(f"Element {element_selector} is not visible, attempting to scroll into view")
                 element.scroll_into_view_if_needed()
+
+            page_changes = "Successfully clicked element"  # response prototype, holds changes of the page after action.
+
+            try:
+                with page.expect_popup(timeout=1000) as popup_info:
+                    element.click()
+                popup = popup_info.value
+                popup.wait_for_load_state()
+
+                self.browser_manager.current_page = popup
+                page_changes += f"\nChange occured: switched to new tab with url {popup.url}"
+
+            except PlaywrightTimeoutError:
+                #  occures when no popup window appeared on click within 1sec timespan
+                #  meaning that click didn't trigger any popup.
+                
+                pass
             
-            element.click()
-            logger.info(f"Successfully clicked element: {element_info.get('type')} - {element_info.get('contents', 'N/A')}")
+
             
+            #wait for some changes
             time.sleep(0.5)
             
             return f"Successfully clicked: {element_info.get('type')} '{element_info.get('label') or element_info.get('contents', 'element')}'"
+            # logger.info(f"Successfully clicked element: {element_info.get('type')} - {element_info.get('contents', 'N/A')}")
             
         except Exception as e:
             logger.error(f"Error clicking element {element_selector}: {e}")
