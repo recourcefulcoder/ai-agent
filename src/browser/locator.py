@@ -10,32 +10,66 @@ from utils.logger import logger
 
 class ElementLocator:
     """
-    Provides intelligent element location strategies.
+    Provides intelligent page element location strategies.
     """
-    
+
+    _informative_roles = {
+        'article', 'section', 'paragraph', 'listitem', 'blockquote', 
+        'heading', 'text', 'list', 'figure', 'img', 'link',
+        'code', 'pre', 'table', 'row', 'cell',
+        'definition', 'term', 'note', 'complementary',
+        'navigation', 'region', 'contentinfo', 'banner', 'text leaf'
+    }  # roles of A11y tree elements those may hold valuable textual information
+
+    _interactive_selectors = {
+        'input': 'input:not([type="hidden"])',
+        'textarea': 'textarea',
+        'select': 'select',
+        'button': 'button',
+        
+        'link': 'a[href]',
+        
+        'details': 'details',
+        'summary': 'summary',
+        
+        'aria_button': '[role="button"]',
+        'aria_link': '[role="link"]',
+        'aria_textbox': '[role="textbox"]',
+        'aria_searchbox': '[role="searchbox"]',
+        'aria_combobox': '[role="combobox"]',
+        'aria_listbox': '[role="listbox"]',
+        'aria_option': '[role="option"]',
+        'aria_checkbox': '[role="checkbox"]',
+        'aria_radio': '[role="radio"]',
+        'aria_switch': '[role="switch"]',
+        'aria_slider': '[role="slider"]',
+        'aria_spinbutton': '[role="spinbutton"]',
+        'aria_menuitem': '[role="menuitem"]',
+        'aria_menuitemcheckbox': '[role="menuitemcheckbox"]',
+        'aria_menuitemradio': '[role="menuitemradio"]',
+        'aria_tab': '[role="tab"]',
+        
+        'clickable_div': 'div[onclick]',
+        'clickable_span': 'span[onclick]',
+        
+        'contenteditable': '[contenteditable="true"]',
+    }  # HTML selectors those are pointing on interactive elements (buttons, links, etc.)
+
     def __init__(self):
         pass
-    
-    def find_semantic(self, description: str) -> Optional[Locator]:
-        """
-        Find an element using semantic/natural language description.
-        This is a more intelligent search that tries multiple strategies.
+
+    def list_informative_elements(self, page: Page) -> List[Dict[str, Any]]:
+        logger.info("Extracting informative elements from accessibility tree...")
         
-        Args:
-            description: Natural language description of the element
-            
-        Returns:
-            Best matching locator
-        """
-        logger.debug(f"Finding element by semantic description: '{description}'")
+        accessibility_tree = page.accessibility.snapshot()
         
-        # TODO: Parse description to extract:
-        # - Element type (button, link, input, etc.)
-        # - Key text/label
-        # - Context (near other elements, etc.)
-        # TODO: Try multiple strategies in order of likelihood
-        # TODO: Return best match based on visibility and position
-        pass
+        if not accessibility_tree:
+            logger.warning("No accessibility tree available")
+            return []
+               
+        informative_elements = self._extract_informative_nodes(accessibility_tree, [])
+        logger.info(f"Extracted {len(informative_elements)} informative elements")
+        return informative_elements
     
     def list_interactive_elements(self, page: Page) -> List[Dict[str, Any]]:
         """
@@ -69,41 +103,7 @@ class ElementLocator:
         interactive_elements = []
         element_id_counter = 0
         
-        selectors = {
-            'input': 'input:not([type="hidden"])',
-            'textarea': 'textarea',
-            'select': 'select',
-            'button': 'button',
-            
-            'link': 'a[href]',
-            
-            'details': 'details',
-            'summary': 'summary',
-            
-            'aria_button': '[role="button"]',
-            'aria_link': '[role="link"]',
-            'aria_textbox': '[role="textbox"]',
-            'aria_searchbox': '[role="searchbox"]',
-            'aria_combobox': '[role="combobox"]',
-            'aria_listbox': '[role="listbox"]',
-            'aria_option': '[role="option"]',
-            'aria_checkbox': '[role="checkbox"]',
-            'aria_radio': '[role="radio"]',
-            'aria_switch': '[role="switch"]',
-            'aria_slider': '[role="slider"]',
-            'aria_spinbutton': '[role="spinbutton"]',
-            'aria_menuitem': '[role="menuitem"]',
-            'aria_menuitemcheckbox': '[role="menuitemcheckbox"]',
-            'aria_menuitemradio': '[role="menuitemradio"]',
-            'aria_tab': '[role="tab"]',
-            
-            'clickable_div': 'div[onclick]',
-            'clickable_span': 'span[onclick]',
-            
-            'contenteditable': '[contenteditable="true"]',
-        }
-        
-        for _, selector in selectors.items():
+        for _, selector in self._interactive_selectors.items():
             try:
                 elements = page.locator(selector).all()
                 
@@ -207,7 +207,8 @@ class ElementLocator:
         
         return unique_elements
     
-    def _generate_selector(self, element: Locator, attributes: Dict[str, Any]) -> str:
+    @staticmethod
+    def _generate_selector(element: Locator, attributes: Dict[str, Any]) -> str:
         """
         Generate a stable CSS selector for an element.
         
@@ -226,3 +227,50 @@ class ElementLocator:
             return f"{tag_name}[name='{attributes['name']}']"
         
         return "unknown"
+
+    @classmethod
+    def _extract_informative_nodes(
+        cls, 
+        node, 
+        informative_elements: List[Dict[str, str]]
+    ) -> List[Dict[str, str]]:
+        """
+        Recursively extract informative elements from the Accessibility tree.
+        "leafs" of the tree are closer to the beginning of the returned list 
+        """
+        role = node.get('role')
+        name = node.get('name', '').strip()
+        
+        if role in cls._informative_roles:
+            content = name
+            
+            if role in {'article', 'section', 'paragraph', 'listitem', 'blockquote'}:
+                child_texts = []
+                
+                def collect_text(n, child_texts):
+                    if 'text' in n.get('role') and n.get('name'):
+                        child_texts.append(n.get('name'))
+                    for child in n.get('children', []):
+                        child_texts = collect_text(child, child_texts) + child_texts
+                    return child_texts
+                        
+                child_texts = collect_text(node, [])
+                
+                if child_texts:
+                    content = '\n'.join(child_texts)
+            
+            if content:
+                informative_elements.append({
+                    'role': role,
+                    'contents': content
+                })
+        
+        for child in node.get('children', []):
+            informative_elements = cls._extract_informative_nodes(
+                child, 
+                informative_elements,
+            ) + informative_elements
+            #  this way nodes with actual data ("leafs" of the tree) will be represented 
+            #  first, which is good for prompting
+        
+        return informative_elements

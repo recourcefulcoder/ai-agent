@@ -276,10 +276,6 @@ class GetElementContextTool(BaseTool):
 
 
 class GetInteractiveElementsTool(BaseTool):
-    """
-    Tool for getting all interactive elements on the current page.
-    """
-    
     name: str = "get_interactive_elements"
     description: str = """
     Get a list of all interactive elements on the current page.
@@ -299,6 +295,78 @@ class GetInteractiveElementsTool(BaseTool):
     def _run(self) -> str:
         """
         Get all interactive elements on the current page.
+        
+        Returns:
+            Formatted list of interactive elements
+        """
+        logger.info("Getting interactive elements from current page")
+        
+        page = self.browser_manager.current_page
+        cache_manager = get_elements_cache()
+        if not page:
+            return "Error: Browser not connected."
+        
+        try:
+            elements = ElementLocator().list_informative_elements(page)
+            
+            cache_manager.clear_cache()
+            new_cache = dict()
+            for element in elements:
+                new_cache[element['id']] = element
+            
+            cache_manager.set_cache(new_cache)
+            
+            if not elements:
+                return "No interactive elements found on the page."
+            
+            result = f"Found {len(elements)} interactive elements:\n\n"
+            
+            # Group by type for better readability
+            by_type: Dict[str, List[Dict]] = dict()
+            for elem in elements:
+                elem_type = elem.get('type', 'unknown')
+                if elem_type not in by_type:
+                    by_type[elem_type] = []
+                by_type[elem_type].append(elem)
+            
+            result += str(by_type) + f"\nTotal: {len(elements)} elements available for interaction"
+            
+            logger.info(f"Cached {len(elements)} elements")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting interactive elements: {e}")
+            return f"Error getting interactive elements: {str(e)}"
+
+
+class GetInformativeElementsTool(BaseTool):
+    name: str = "get_interactive_elements"
+    description: str = """
+    Get a list of all informative elements on the current page.
+    Informative elements are all those elements that contain text information, vital for understanding page contents.
+    
+    Use this tool to understand the page contents.
+
+    Use cases examples: 
+       * you want to scan through film rating site, to find best one
+       * you want to find vacancy description on LinkedIn to form best fitting CV for it.
+       * you want to make some sort of research, and page contains vital information on the theme being researched.
+    
+    Example of usage: get_interactive_elements()
+    """
+    args_schema: type[BaseModel] = GetInteractiveElementsInput
+    browser_manager: BrowserManager = Field(
+        exclude=True, 
+        default_factory=BrowserManager,
+    )
+
+    def _arun(self) -> str:
+        pass
+    
+    def _run(self) -> str:
+        """
+        Get all informative elements (i.e. containing some text 
+        information, vital for understanding page contents) on the current page.
         
         Returns:
             Formatted list of interactive elements
