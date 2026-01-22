@@ -1,3 +1,4 @@
+cryptography==46.0.3
 langchain==0.3.12
 langchain-community==0.3.12
 langgraph==0.2.59

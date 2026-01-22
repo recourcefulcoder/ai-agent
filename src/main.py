@@ -40,14 +40,44 @@ def run_task(
     try:
         if agent is None:
             agent = get_agent()
+        if initial_state is None:
             initial_state = create_initial_state(task)
         
-        # TODO: Stream or invoke the graph with initial state
-        # TODO: Handle intermediate outputs (show progress)
-        # TODO: Get final state
+        # Invoke the agent graph
+        logger.info("Starting agent execution...")
         
-        final_state = None  
+        final_state = None
+        step_count = 0
+        max_steps = 20
         
+        # Stream the execution to show progress
+        for event in agent.stream(initial_state, {"recursion_limit": max_steps}):
+            step_count += 1
+            
+            # Show progress
+            for node_name, node_output in event.items():
+                logger.debug(f"Node {node_name} executed")
+                
+                # Show messages from tools
+                if "messages" in node_output:
+                    messages = node_output["messages"]
+                    if messages:
+                        for msg in messages:
+                            if hasattr(msg, 'content') and msg.content:
+                                # Only show tool messages and important AI responses
+                                if msg.__class__.__name__ == "ToolMessage":
+                                    console.print(f"[dim]→ {str(msg.content)[:200]}...[/dim]")
+                                elif msg.__class__.__name__ == "AIMessage" and not hasattr(msg, 'tool_calls'):
+                                    console.print(f"[cyan]AI: {str(msg.content)[:200]}...[/cyan]")
+            
+            # Update final_state
+            if event:
+                # Get the last node's output
+                final_state = list(event.values())[0]
+        
+        logger.info(f"Agent execution completed after {step_count} steps")
+        
+        # Display final result
         if final_state and final_state.get("success"):
             console.print(Panel(
                 final_state.get("final_message", "Task completed!"),
@@ -72,22 +102,25 @@ def run_task(
 
 def interactive_mode(debug: bool = False) -> None:
     console.print(Panel(
-        "[bold cyan]Browser AI Agent - Interactive Mode[/bold cyan]\n\n"
+        "[bold cyan]Browser AI Agent - Interactive Mode[/bold cyan]\\n\\n"
         "Enter tasks in natural language. Type 'exit' or 'quit' to stop.",
         border_style="cyan"
     ))
     
     agent = get_agent()
-    initial_state = create_initial_state(task)
+    
     try:
         while True:
-            task = console.input("\n[bold cyan]Enter your task:[/bold cyan] ")
+            task = console.input("\\n[bold cyan]Enter your task:[/bold cyan] ")
             
             if task.lower() in ("exit", "quit", "q"):
                 break
             
             if not task.strip():
                 continue
+            
+            # Create new state for each task
+            initial_state = create_initial_state(task)
             
             run_task(
                 task, 

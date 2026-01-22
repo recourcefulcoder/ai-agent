@@ -6,7 +6,12 @@ Handles loading, saving, and encrypting user preferences.
 import json
 from pathlib import Path
 from typing import Optional
-from cryptography.fernet import Fernet
+
+try:
+    from cryptography.fernet import Fernet
+    HAS_CRYPTOGRAPHY = True
+except ImportError:
+    HAS_CRYPTOGRAPHY = False
 
 from models.user import UserPreferences
 from config.settings import settings

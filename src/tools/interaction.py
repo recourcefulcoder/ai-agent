@@ -68,7 +68,7 @@ class ClickElementTool(BaseTool):
             element_selector: The unqie selector of the element to click
             
         Returns:
-            Success or error message
+            Success or error message with information about browser changes
         """        
         page = self.browser_manager.current_page
         
@@ -93,30 +93,95 @@ class ClickElementTool(BaseTool):
                 logger.warning(f"Element {element_selector} is not visible, attempting to scroll into view")
                 element.scroll_into_view_if_needed()
 
-            page_changes = "Successfully clicked element"  # response prototype, holds changes of the page after action.
+            # Capture state before click
+            initial_url = page.url
+            initial_pages_count = len(self.browser_manager.get_all_pages())
+            
+            # Store initial page content hash to detect changes
+            try:
+                initial_body_html = page.locator('body').inner_html()
+            except:
+                initial_body_html = ""
+            
+            page_changes = []
 
+            # Try to detect popup windows
+            popup_opened = False
             try:
                 with page.expect_popup(timeout=1000) as popup_info:
                     element.click()
                 popup = popup_info.value
-                popup.wait_for_load_state()
-
-                self.browser_manager.current_page = popup
-                page_changes += f"\nChange occured: switched to new tab with url {popup.url}"
-
+                popup.wait_for_load_state("domcontentloaded")
+                self.browser_manager._current_page = popup
+                page_changes.append(f"New window/tab opened with URL: {popup.url}")
+                popup_opened = True
+                logger.info(f"Popup opened: {popup.url}")
             except PlaywrightTimeoutError:
-                #  occures when no popup window appeared on click within 1sec timespan
-                #  meaning that click didn't trigger any popup.
-                
+                # No popup appeared, element was clicked on the same page
                 pass
             
-
+            # If no popup, wait for potential page changes
+            if not popup_opened:
+                time.sleep(0.5)
+                
+                # Check for URL change (navigation)
+                if page.url != initial_url:
+                    page_changes.append(f"Page navigated from {initial_url} to {page.url}")
+                    logger.info(f"Navigation detected: {page.url}")
+                
+                # Check for new pages/tabs
+                current_pages_count = len(self.browser_manager.get_all_pages())
+                if current_pages_count > initial_pages_count:
+                    page_changes.append(f"New tab/window detected ({current_pages_count - initial_pages_count} new)")
+                
+                # Check for DOM changes (dialogs, modals, alerts, etc.)
+                try:
+                    # Look for common modal/dialog indicators
+                    modal_selectors = [
+                        '[role="dialog"]', '[role="alertdialog"]',
+                        '.modal', '.popup', '.dialog', 
+                        '[aria-modal="true"]', '.overlay'
+                    ]
+                    for modal_sel in modal_selectors:
+                        modals = page.locator(modal_sel)
+                        if modals.count() > 0 and modals.first.is_visible():
+                            page_changes.append(f"Modal/dialog appeared on page")
+                            logger.info("Modal/dialog detected")
+                            break
+                    
+                    # Check for alerts/notifications
+                    alert_selectors = [
+                        '[role="alert"]', '.alert', '.notification', 
+                        '.toast', '.message', '.success', '.error'
+                    ]
+                    for alert_sel in alert_selectors:
+                        alerts = page.locator(alert_sel)
+                        if alerts.count() > 0 and alerts.first.is_visible():
+                            alert_text = alerts.first.inner_text()[:100]
+                            page_changes.append(f"Alert/notification appeared: '{alert_text}'")
+                            logger.info(f"Alert detected: {alert_text}")
+                            break
+                    
+                    # Detect significant content changes (for SPAs)
+                    current_body_html = page.locator('body').inner_html()
+                    if abs(len(current_body_html) - len(initial_body_html)) > 1000:
+                        page_changes.append("Significant page content change detected (likely SPA update)")
+                        logger.info("Significant DOM change detected")
+                        
+                except Exception as e:
+                    logger.debug(f"Error checking for page changes: {e}")
             
-            #wait for some changes
-            time.sleep(0.5)
+            # Build result message
+            element_desc = element_info.get('label') or element_info.get('contents') or 'element'
+            result = f"Successfully clicked: {element_info.get('type')} '{element_desc}'"
             
-            return f"Successfully clicked: {element_info.get('type')} '{element_info.get('label') or element_info.get('contents', 'element')}'"
-            # logger.info(f"Successfully clicked element: {element_info.get('type')} - {element_info.get('contents', 'N/A')}")
+            if page_changes:
+                result += "\n\nBrowser changes detected:\n- " + "\n- ".join(page_changes)
+            else:
+                result += "\n\nNo significant browser changes detected after click."
+            
+            logger.info(f"Click completed: {element_info.get('type')}")
+            return result
             
         except Exception as e:
             logger.error(f"Error clicking element {element_selector}: {e}")

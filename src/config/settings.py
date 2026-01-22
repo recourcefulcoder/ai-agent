@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     log_to_file: bool = True
     log_file_path: str = "logs/agent.log"
     
+    user_profile_path: str = "data/user_profile.json"
+    encrypt_user_data: bool = False
+    
     @property
     def project_root(self) -> Path:
         return Path(__file__).parent.parent

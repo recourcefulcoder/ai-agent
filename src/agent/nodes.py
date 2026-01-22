@@ -2,8 +2,6 @@ from typing import Dict, Any
 from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
 from agent.state import AgentState
 from models.task import TaskPlan, BrowserAction, ExecutionResult
-from tools.interaction import create_interaction_tools
-from tools.navigation import create_navigation_tools
 from utils.logger import logger
 
 
@@ -27,19 +25,33 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     
     user_request = state["user_request"]
     
-    # TODO: Load main agent prompt
-    # TODO: Create LLM chain for planning
-    # TODO: Invoke LLM with user request
-    # TODO: Parse response into TaskPlan using structured output
-    # TODO: Log the plan
-    # TODO: Return updated state with task_plan
+    from services.llm import get_llm_service
+    from tools import get_all_tools
+    
+    # Get LLM with tool binding
+    llm = get_llm_service().get_main_llm()
+    tools = get_all_tools()
+    llm_with_tools = llm.bind_tools(tools)
+    
+    # Add user request to messages
+    messages = state["messages"] + [HumanMessage(content=user_request)]
+    
+    # Invoke LLM to get planning response
+    response = llm_with_tools.invoke(messages)
+    
+    logger.info(f"Planning response received")
+    
+    # For now, we'll use a simple plan structure
+    # In a more advanced implementation, you could use structured output
+    plan = TaskPlan(
+        task_description=user_request,
+        steps=[],  # Will be populated by execute node dynamically
+        requires_user_data=False,
+    )
     
     return {
-        "task_plan": None,  # TODO: Replace with actual plan
-        "messages": state["messages"] + [
-            HumanMessage(content=user_request),
-            # AIMessage with plan
-        ]
+        "task_plan": plan,
+        "messages": messages + [response],
     }
 
 
@@ -47,11 +59,7 @@ def execute_action_node(state: AgentState) -> Dict[str, Any]:
     """
     Execution node: Executes the current browser action.
     
-    This node:
-    1. Gets the current action from the plan
-    2. Invokes the appropriate tool
-    3. Records the result
-    4. Moves to next action
+    This node uses the LLM with tools to decide and execute actions.
     
     Args:
         state: Current agent state
@@ -61,22 +69,27 @@ def execute_action_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.info("Executing action...")
     
-    task_plan = state["task_plan"]
-    action_index = state["current_action_index"]
+    from services.llm import get_llm_service
+    from tools import get_all_tools
     
-    # TODO: Get current action from plan
-    # TODO: Check if action requires confirmation
-    # TODO: If sensitive and not confirmed, set pending_confirmation
-    # TODO: Otherwise, execute the action using appropriate tool
-    # TODO: Create ExecutionResult
-    # TODO: Increment action index
-    # TODO: Return updated state
+    messages = state["messages"]
     
-    return {
-        "current_action": None,  # TODO: Replace
-        "execution_results": state["execution_results"],  # TODO: Append result
-        "current_action_index": action_index + 1,
-    }
+    # Check if last message has tool calls
+    if messages and hasattr(messages[-1], 'tool_calls') and messages[-1].tool_calls:
+        # Execute the tool calls
+        result = tool_node(state)
+        return result
+    else:
+        # LLM needs to decide next action
+        llm = get_llm_service().get_main_llm()
+        tools = get_all_tools()
+        llm_with_tools = llm.bind_tools(tools)
+        
+        response = llm_with_tools.invoke(messages)
+        
+        return {
+            "messages": [response],
+        }
 
 
 def verify_action_node(state: AgentState) -> Dict[str, Any]:
@@ -96,12 +109,19 @@ def verify_action_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.info("Verifying action...")
     
-    # TODO: Get last execution result
-    # TODO: Check if action succeeded
-    # TODO: If failed, increment error_count
-    # TODO: Consider taking screenshot for debugging
-    # TODO: Return updated state
+    messages = state["messages"]
     
+    # Check if last message indicates an error
+    if messages and hasattr(messages[-1], 'content'):
+        content = str(messages[-1].content)
+        if content.startswith("Error:"):
+            logger.warning(f"Action failed: {content}")
+            return {
+                "error_count": state.get("error_count", 0) + 1,
+                "last_error": content,
+            }
+    
+    # Action succeeded
     return {}
 
 
@@ -109,10 +129,7 @@ def handle_error_node(state: AgentState) -> Dict[str, Any]:
     """
     Error handling node: Attempts to recover from failures.
     
-    This node:
-    1. Analyzes the error
-    2. Decides on recovery strategy (retry, alternative approach, abort)
-    3. Updates plan if needed
+    This node logs the error and lets the LLM decide how to recover.
     
     Args:
         state: Current agent state
@@ -122,27 +139,26 @@ def handle_error_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.warning("Handling error...")
     
-    last_error = state["last_error"]
-    error_count = state["error_count"]
+    last_error = state.get("last_error", "Unknown error")
+    error_count = state.get("error_count", 0)
     
-    # TODO: Analyze error type
-    # TODO: If retries available, plan retry
-    # TODO: If max retries exceeded, consider alternative approach
-    # TODO: Use LLM to suggest recovery strategy
-    # TODO: Return updated state
+    logger.error(f"Error #{error_count}: {last_error}")
     
-    return {}
+    # Add error context to messages
+    error_msg = HumanMessage(
+        content=f"The last action failed with error: {last_error}. Please try a different approach or continue with the task."
+    )
+    
+    return {
+        "messages": [error_msg],
+    }
 
 
 def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     """
     Confirmation node: Requests user confirmation for sensitive actions.
     
-    This node:
-    1. Formats confirmation request
-    2. Displays to user (via CLI)
-    3. Waits for user response
-    4. Updates state based on confirmation
+    This node displays a confirmation request and waits for user input.
     
     Args:
         state: Current agent state
@@ -152,28 +168,39 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.info("Seeking user confirmation...")
     
-    pending = state["pending_confirmation"]
+    from rich.console import Console
+    from rich.panel import Panel
     
-    # TODO: Format confirmation request for user
-    # TODO: Display in CLI with colored output
-    # TODO: Get user input (y/n)
-    # TODO: Update user_confirmed flag
-    # TODO: Return updated state
+    console = Console()
+    pending = state.get("pending_confirmation", "")
+    
+    if pending:
+        console.print(Panel(
+            f"[bold yellow]Confirmation Required[/bold yellow]\n\n{pending}",
+            border_style="yellow"
+        ))
+        
+        response = console.input("[bold yellow]Proceed? (yes/no):[/bold yellow] ").strip().lower()
+        confirmed = response in ['yes', 'y']
+        
+        logger.info(f"User {'confirmed' if confirmed else 'declined'} action")
+        
+        return {
+            "user_confirmed": confirmed,
+            "pending_confirmation": None,
+        }
     
     return {
-        "user_confirmed": False,  # TODO: Replace with actual response
+        "user_confirmed": True,
         "pending_confirmation": None,
     }
 
 
-async def finalize_node(state: AgentState) -> Dict[str, Any]:
+def finalize_node(state: AgentState) -> Dict[str, Any]:
     """
     Finalization node: Wraps up task execution and reports results.
     
-    This node:
-    1. Summarizes what was accomplished
-    2. Lists any artifacts created
-    3. Reports any issues encountered
+    This node summarizes the conversation and task completion.
     
     Args:
         state: Current agent state
@@ -183,27 +210,44 @@ async def finalize_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.info("Finalizing task...")
     
-    execution_results = state["execution_results"]
+    messages = state["messages"]
+    error_count = state.get("error_count", 0)
     
-    # TODO: Count successful vs failed actions
-    # TODO: Create summary message
-    # TODO: List screenshots or other artifacts
-    # TODO: Set success flag
-    # TODO: Return updated state with final_message
+    # Check if there were too many errors
+    if error_count >= 3:
+        return {
+            "success": False,
+            "final_message": f"Task failed after {error_count} errors. Please try again or rephrase your request.",
+        }
+    
+    # Summarize based on messages
+    if messages:
+        last_msg = messages[-1]
+        if hasattr(last_msg, 'content'):
+            content = str(last_msg.content)
+            
+            # Check if task seems complete
+            completion_indicators = ["completed", "done", "finished", "success"]
+            if any(indicator in content.lower() for indicator in completion_indicators):
+                return {
+                    "success": True,
+                    "final_message": "Task completed successfully!",
+                }
     
     return {
-        "success": True,  # TODO: Calculate based on results
-        "final_message": "Task completed!",  # TODO: Create detailed summary
+        "success": True,
+        "final_message": "Task execution finished.",
     }
 
 
 def tool_node(state: AgentState):
     """
-        tool_node performs tool calls and return results; 
-        copied straight up from docs
+    Tool node performs tool calls and returns results.
     """
+    from tools import get_all_tools
+    
     result = []
-    tools = create_navigation_tools() + create_interaction_tools()
+    tools = get_all_tools()
     tools_by_name = {tool.name: tool for tool in tools}
     
     for tool_call in state["messages"][-1].tool_calls:
