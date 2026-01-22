@@ -1,4 +1,5 @@
 from typing import Type
+import json
 
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -73,8 +74,10 @@ class OpenPageTool(BaseTool):
                 ElementsCacheManager().track_dom_changes
             )
 
-            response = opened_page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_load_state("domcontentloaded")
+            response = opened_page.goto(
+                url, 
+                wait_until="domcontentloaded", 
+            )
             
             title = page.title()
             current_url = page.url

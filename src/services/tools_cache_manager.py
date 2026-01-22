@@ -53,6 +53,7 @@ class ElementsCacheManager:
     ) -> None:
         if self._cache_mapping.get(page_url, None) is None:
             self._cache_mapping[page_url] = PageCache()
+        self.del_interactve_updates(page_url)
         self._cache_mapping[page_url].interactive_cache = interactive_cache
     
     def set_informative_cache(
@@ -62,6 +63,7 @@ class ElementsCacheManager:
     ) -> None:
         if self._cache_mapping.get(page_url, None) is None:
             self._cache_mapping[page_url] = PageCache()
+        self.del_info_updates(page_url)
         self._cache_mapping[page_url].informative_cache = informative_cache
     
     def clear_interactive_cache(self, page_url: str) -> None:
@@ -69,6 +71,12 @@ class ElementsCacheManager:
             page_url, 
             PageCache(),
         ).interactive_cache.clear()
+
+    def clear_informative_cache(self, page_url: str) -> None:
+        self._cache_mapping.get(
+            page_url, 
+            PageCache(),
+        ).informative_cache.clear()
     
     def get_element(self, page_url: str, element_selector: str) -> Optional[Dict[str, Any]]:
         return self._cache_mapping.get(
@@ -76,6 +84,18 @@ class ElementsCacheManager:
             PageCache(),
         ).interactive_cache.get(element_selector, None)
     
+    def get_info_updates(self, page_url: str) -> Dict[str, Dict[str, Any]]:
+        """
+        Returns updates of interactive elements on page with specified url
+        """
+        return self._cache_mapping.get(page_url).info_updates
+
+    def get_interactive_updates(self, page_url: str) -> Dict[str, Dict[str, Any]]:
+        """
+        Returns updates of interactive elements on page with specified url
+        """
+        return self._cache_mapping.get(page_url).interactive_updates
+
     def track_dom_changes(self, page: Page) -> None:
         # page value implied to be valid
         if self._cache_mapping.get(page.url, None) is None:
@@ -92,7 +112,7 @@ class ElementsCacheManager:
         )
 
         if len(delta_info) != 0:
-            self._cache_mapping.get(page.url).informative_cache = info_cache
+            self._cache_mapping.get(page.url).informative_cache = info_cache 
             for element in delta_info:
                 self._cache_mapping.get(page.url).info_updates[element["selector"]] = element
         if len(delta_inter) != 0:
