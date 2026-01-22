@@ -4,6 +4,7 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from browser.manager import BrowserManager
 from utils.logger import logger
+from services.tools_cache_manager import ElementsCacheManager
 
 
 class SearchInput(BaseModel):
@@ -64,8 +65,13 @@ class OpenPageTool(BaseTool):
                 with self.browser_manager._context.expect_page() as new_page_info:
                     page.evaluate('window.open("about:blank", "_blank")')
                 opened_page = new_page_info.value
+                
             opened_page.bring_to_front()
             self.browser_manager.current_page = opened_page
+            self.browser_manager.current_page.on(
+                "domcontentloaded", 
+                ElementsCacheManager().track_dom_changes
+            )
 
             response = opened_page.goto(url, wait_until="domcontentloaded", timeout=30000)
             page.wait_for_load_state("domcontentloaded")

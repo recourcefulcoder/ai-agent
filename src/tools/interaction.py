@@ -9,7 +9,7 @@ from browser.manager import BrowserManager
 from browser.locator import ElementLocator
 from config.settings import settings
 from utils.logger import logger
-from services.tools_cache_manager import get_elements_cache
+from services.tools_cache_manager import ElementsCacheManager
 
 class ClickElementInput(BaseModel):
     """Input schema for clicking an element."""
@@ -62,7 +62,7 @@ class ClickElementTool(BaseTool):
     
     def _run(self, element_selector: str) -> str:
         """
-        Click on the element with the given ID.
+        Click on the element with the given selector.
         
         Args:
             element_selector: The unqie selector of the element to click
@@ -75,7 +75,7 @@ class ClickElementTool(BaseTool):
         if not page:
             return "Error: Browser not connected. Use the browser manager to connect first."
         
-        cache = get_elements_cache().get_cache(page.url)
+        cache = ElementsCacheManager().get_cache(page.url)
 
         if cache is None or element_selector not in cache.keys():
             return f"Error: Element with selector {element_selector} not found. Use 'get_interactive_elements' first to get the list of elements."
@@ -93,30 +93,88 @@ class ClickElementTool(BaseTool):
                 logger.warning(f"Element {element_selector} is not visible, attempting to scroll into view")
                 element.scroll_into_view_if_needed()
 
-            page_changes = "Successfully clicked element"  # response prototype, holds changes of the page after action.
+            # Capture state before click
+            initial_url = page.url
+            initial_pages_count = len(self.browser_manager.get_all_pages())
+            
+            # Store initial page content hash to detect changes
+            try:
+                initial_body_html = page.locator('body').inner_html()
+            except:
+                initial_body_html = ""
+            
+            page_changes = []
 
+            # Try to detect popup windows
+            popup_opened = False
             try:
                 with page.expect_popup(timeout=1000) as popup_info:
                     element.click()
                 popup = popup_info.value
-                popup.wait_for_load_state()
-
-                self.browser_manager.current_page = popup
-                page_changes += f"\nChange occured: switched to new tab with url {popup.url}"
-
+                popup.wait_for_load_state("domcontentloaded")
+                self.browser_manager._current_page = popup
+                page_changes.append(f"New window/tab opened with URL: {popup.url}")
+                popup_opened = True
+                logger.info(f"Popup opened: {popup.url}")
             except PlaywrightTimeoutError:
-                #  occures when no popup window appeared on click within 1sec timespan
-                #  meaning that click didn't trigger any popup.
-                
+                # No popup appeared, element was clicked on the same page
                 pass
             
-
+            # If no popup, wait for potential page changes
+            if not popup_opened:
+                time.sleep(0.5)
+                
+                # Check for URL change (navigation)
+                if page.url != initial_url:
+                    page_changes.append(f"Page navigated from {initial_url} to {page.url}")
+                    logger.info(f"Navigation detected: {page.url}")
+                
+                # Check for DOM changes (dialogs, modals, alerts, etc.)
+                try:
+                    # Look for common modal/dialog indicators
+                    modal_selectors = [
+                        '[role="dialog"]', '[role="alertdialog"]',
+                        '.modal', '.popup', '.dialog', 
+                        '[aria-modal="true"]', '.overlay'
+                    ]
+                    for modal_sel in modal_selectors:
+                        modals = page.locator(modal_sel)
+                        if modals.count() > 0 and modals.first.is_visible():
+                            page_changes.append(f"Modal/dialog appeared on page")
+                            logger.info("Modal/dialog detected")
+                            break
+                    
+                    # Check for alerts/notifications
+                    alert_selectors = [
+                        '[role="alert"]', '.alert', '.notification', 
+                        '.toast', '.message', '.success', '.error'
+                    ]
+                    for alert_sel in alert_selectors:
+                        alerts = page.locator(alert_sel)
+                        if alerts.count() > 0 and alerts.first.is_visible():
+                            alert_text = alerts.first.inner_text()[:100]
+                            page_changes.append(f"Alert/notification appeared: '{alert_text}'")
+                            logger.info(f"Alert detected: {alert_text}")
+                            break
+                    
+                    # Detect significant content changes (for SPAs)
+                    current_body_html = page.locator('body').inner_html()
+                    if abs(len(current_body_html) - len(initial_body_html)) > 1000:
+                        page_changes.append("Significant page content change detected (likely SPA update)")
+                        logger.info("Significant DOM change detected")
+                        
+                except Exception as e:
+                    logger.debug(f"Error checking for page changes: {e}")
             
-            #wait for some changes
-            time.sleep(0.5)
+            result = f"Successfully clicked: {element_info.get('type')}"
             
-            return f"Successfully clicked: {element_info.get('type')} '{element_info.get('label') or element_info.get('contents', 'element')}'"
-            # logger.info(f"Successfully clicked element: {element_info.get('type')} - {element_info.get('contents', 'N/A')}")
+            if page_changes:
+                result += "\n\nBrowser changes detected:\n- " + "\n- ".join(page_changes)
+            else:
+                result += "\n\nNo browser changes detected after click."
+            
+            logger.info(f"Click completed: {element_info.get('type')}")
+            return result
             
         except Exception as e:
             logger.error(f"Error clicking element {element_selector}: {e}")
@@ -160,7 +218,7 @@ class InputTextTool(BaseTool):
         if not page:
             return "Error: Browser not connected."
         
-        cache = get_elements_cache().get_cache(page.url)
+        cache = ElementsCacheManager().get_cache(page.url)
 
         if cache is None or element_selector not in cache.keys():
             return f"Error: Element ID {element_selector} not found. Use 'get_interactive_elements' first."
@@ -224,7 +282,7 @@ class GetElementContextTool(BaseTool):
         logger.info(f"Getting context for element {element_selector}")
         
         page = self.browser_manager.current_page
-        cache = get_elements_cache().get_cache()
+        cache = ElementsCacheManager().get_cache()
         if not page:
             return "Error: Browser not connected."
         
@@ -323,19 +381,18 @@ class GetInteractiveElementsTool(BaseTool):
         logger.info("Getting interactive elements from current page")
         
         page = self.browser_manager.current_page
-        cache_manager = get_elements_cache()
+        cache_manager = ElementsCacheManager()
         if not page:
             return "Error: Browser not connected."
         
         try:
             elements = ElementLocator().list_informative_elements(page)
             
-            cache_manager.clear_cache()
             new_cache = dict()
             for element in elements:
                 new_cache[element['id']] = element
             
-            cache_manager.set_cache(new_cache)
+            cache_manager.set_interactive_cache(new_cache, page.url)
             
             if not elements:
                 return "No interactive elements found on the page."
@@ -395,7 +452,7 @@ class GetInformativeElementsTool(BaseTool):
         logger.info("Getting interactive elements from current page")
         
         page = self.browser_manager.current_page
-        cache_manager = get_elements_cache()
+        cache_manager = ElementsCacheManager()
         if not page:
             return "Error: Browser not connected."
         
@@ -404,12 +461,11 @@ class GetInformativeElementsTool(BaseTool):
             locator = ElementLocator()
             elements = locator.list_interactive_elements(page)
             
-            cache_manager.clear_cache()
             new_cache = dict()
             for element in elements:
                 new_cache[element['id']] = element
             
-            cache_manager.set_cache(new_cache)
+            cache_manager.set_interactive_cache(new_cache)
             
             if not elements:
                 return "No interactive elements found on the page."

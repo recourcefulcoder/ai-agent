@@ -191,17 +191,7 @@ class ElementLocator:
         
         logger.info(f"Found {len(interactive_elements)} interactive elements")
         
-        # Remove duplicates (same selector appearing multiple times)
-        seen_selectors = set()
-        unique_elements = []
-        for elem in interactive_elements:
-            if elem['selector'] not in seen_selectors:
-                seen_selectors.add(elem['selector'])
-                unique_elements.append(elem)
-        
-        logger.info(f"After deduplication: {len(unique_elements)} unique interactive elements")
-        
-        return unique_elements
+        return interactive_elements
     
     @staticmethod
     def _generate_selector(element: Locator, attributes: Dict[str, Any]) -> str:
