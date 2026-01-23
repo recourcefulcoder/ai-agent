@@ -59,24 +59,24 @@ def execute_task(
                     print(chunk.content, end="", flush=True)
             
             # Show progress
-            for node_name, node_output in event.items():
-                logger.debug(f"Node {node_name} executed")
+            # for node_name, node_output in event.items():
+            #     logger.debug(f"Node {node_name} executed")
                 
-                # Show messages from tools
-                if "messages" in node_output:
-                    messages = node_output["messages"]
-                    if messages:
-                        for msg in messages:
-                            if hasattr(msg, 'content') and msg.content:
-                                # Only show tool messages and important AI responses
-                                if type(msg) == ToolMessage:
-                                    console.print(f"[dim]→ {str(msg.content)[:200]}...[/dim]")
-                                elif type(msg) == AIMessage:
-                                    #  and not hasattr(msg, 'tool_calls')
-                                    console.print(f"[cyan]AI: {str(msg.content)[:200]}...[/cyan]")
+            #     # Show messages from tools
+            #     if "messages" in node_output:
+            #         messages = node_output["messages"]
+            #         if messages:
+            #             for msg in messages:
+            #                 if hasattr(msg, 'content') and msg.content:
+            #                     # Only show tool messages and important AI responses
+            #                     if type(msg) == ToolMessage:
+            #                         console.print(f"[dim]→ {str(msg.content)[:200]}...[/dim]")
+            #                     elif type(msg) == AIMessage:
+            #                         #  and not hasattr(msg, 'tool_calls')
+            #                         console.print(f"[cyan]AI: {str(msg.content)[:200]}...[/cyan]")
             
-            if event:
-                final_state = list(event.values())[0]
+            # if event:
+            #     final_state = list(event.values())[0]
         
         logger.info(f"Agent execution completed after {step_count} steps")
         

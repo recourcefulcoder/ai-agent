@@ -24,7 +24,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Install Playwright browsers
-playwright install chromium
+playwright install firefox
 
 # Configure environment
 cp .env.example .env
