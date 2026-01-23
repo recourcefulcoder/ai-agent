@@ -2,7 +2,7 @@ from typing import Dict, Any
     
 from rich.console import Console
 from rich.panel import Panel
-from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 
 from agent.state import AgentState
 from models.task import TaskPlan, BrowserActionSuggestion, DangerCheck
@@ -10,6 +10,7 @@ from utils.logger import logger
 from services.llm import get_llm_service
 from tools.interaction import create_interaction_tools
 from tools.navigation import create_navigation_tools
+from config.settings import settings
 
 
 def plan_task_node(state: AgentState) -> Dict[str, Any]:
@@ -41,7 +42,7 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
         .bind_tools(tools)
     )
     
-    messages = state["messages"] + [HumanMessage(content=user_request)]
+    messages = state.get("messages") + [HumanMessage(content=user_request)]
     
     response = llm.invoke(messages)
     
@@ -114,7 +115,12 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
         .with_structured_output(DangerCheck)
     )
 
-    is_sensitive = llm.invoke(state.current_action.description)
+    messages = [
+        SystemMessage(content=settings.get_prompt("safety_check")),
+        AIMessage(content=state.current_action.description)
+    ]
+
+    is_sensitive = llm.invoke(messages)
 
     if is_sensitive:
         console.print(Panel(

@@ -51,18 +51,18 @@ class TaskPlan(BaseModel):
         pass
 
 
-class TaskResult(BaseModel):
-    success: bool = Field(
-        description="Whether the overall task succeeded"
-    )
-    message: str = Field(
-        description="Summary message for the user"
-    )
-    execution_results: List[ExecutionResult] = Field(
-        default_factory=list,
-        description="Results of individual actions"
-    )
-    artifacts: List[str] = Field(
-        default_factory=list,
-        description="Paths to screenshots or other generated files"
-    )
+# class TaskResult(BaseModel):
+#     success: bool = Field(
+#         description="Whether the overall task succeeded"
+#     )
+#     message: str = Field(
+#         description="Summary message for the user"
+#     )
+#     execution_results: List[ExecutionResult] = Field(
+#         default_factory=list,
+#         description="Results of individual actions"
+#     )
+#     artifacts: List[str] = Field(
+#         default_factory=list,
+#         description="Paths to screenshots or other generated files"
+#     )
