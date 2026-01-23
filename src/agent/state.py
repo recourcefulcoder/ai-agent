@@ -14,8 +14,12 @@ class AgentState(TypedDict):
     # Messages exchanged with the LLM (for reasoning)
     messages: Annotated[List[AIMessage | SystemMessage | HumanMessage], add_messages]
     task_plan: Optional[TaskPlan]
+
+    current_plan_goal: Optional[str]
+    current_plan_goal_achieved: bool
     current_action: Optional[BrowserAction]
     current_action_index: int
+    
     execution_results: List[ExecutionResult]
     browser_manager: BrowserManager
     
@@ -37,6 +41,8 @@ def create_initial_state(user_request: str) -> AgentState:
         user_request=user_request,
         messages=[sys_prompt],
         task_plan=None,
+        current_plan_goal=None,
+        current_plan_goal_achieved=False,
         current_action=None,
         current_action_index=0,
         execution_results=[],

@@ -42,6 +42,12 @@ class BrowserAction(BaseModel):
         description="Whether this action requires user confirmation"
     )
     
+
+    def __str__(self):
+        response = f"I should perform \"{self.action_type}\" action on target \"{self.target}\", because {self.reason}"
+        return response
+
+
     class Config:
         use_enum_values = True
 
@@ -53,17 +59,9 @@ class TaskPlan(BaseModel):
     task_description: str = Field(
         description="Natural language description of what needs to be done"
     )
-    steps: List[BrowserAction] = Field(
-        description="Ordered list of actions to accomplish the task"
-    )
-    estimated_duration: Optional[str] = Field(
-        default=None,
-        description="Rough estimate of how long this will take"
-    )
-    requires_user_data: bool = Field(
-        default=False,
-        description="Whether this task needs user preferences/data"
-    )
+    steps: List[str] = Field(
+        description="Ordered list of subtasks to accomplish the task"
+    )  # TODO: Edit description for AI to better understand planning
     
     def __str__(self) -> str:
         """Human-readable representation of the plan."""

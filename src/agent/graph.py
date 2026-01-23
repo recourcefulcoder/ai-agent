@@ -1,20 +1,20 @@
 from typing import Literal
 from langgraph.graph import StateGraph, END
+from langgraph.prebuilt import ToolNode
 from agent.state import AgentState
 from agent.nodes import (
     plan_task_node,
-    execute_action_node,
-    verify_action_node,
-    handle_error_node,
+    choose_next_action_node,
+    reflect_browser_action_node,
     seek_confirmation_node,
     finalize_node,
 )
 from utils.logger import logger
 
 
-def should_continue_execution(state: AgentState) -> Literal["execute", "finalize"]:
+def should_continue_execution(state: AgentState) -> Literal["continue", "finalize"]:
     """
-    Decide whether to continue executing actions or finalize.
+    Decide whether to continue executing plan goals or finalize.
     
     Args:
         state: Current agent state
@@ -22,34 +22,22 @@ def should_continue_execution(state: AgentState) -> Literal["execute", "finalize
     Returns:
         Next node name
     """
-    messages = state.get("messages", [])
-    
-    # Check if we've exceeded max errors
-    if state.get("error_count", 0) >= 3:
+    if state.get("current_plan_goal") is None:
         return "finalize"
     
-    # Check if last message has tool calls (more work to do)
-    if messages and hasattr(messages[-1], 'tool_calls') and messages[-1].tool_calls:
-        return "execute"
-    
-    # Check if last message indicates completion
-    if messages and hasattr(messages[-1], 'content'):
-        content = str(messages[-1].content).lower()
-        completion_phrases = [
-            "task completed", "task is complete", "finished", 
-            "done", "successfully completed", "all set"
-        ]
-        if any(phrase in content for phrase in completion_phrases):
-            return "finalize"
-    
-    # Continue if we haven't done much yet
-    if len(messages) < 10:
-        return "execute"
-    
-    return "finalize"
+    return "continue"
 
+def user_confirmed_action(state: AgentState) -> Literal["confirmed", "rejected"]:
+    """Checks whether current BrowserAction was confirmed by user or not"""
+    if state.get("user_confirmed"):
+        return "confirmed"
+    return "rejected"
 
-def should_seek_confirmation(state: AgentState) -> Literal["confirm", "verify"]:
+def reflection_mapping(state: AgentState) -> Literal["proceed_with_next", "continue_current"]:
+    """Decides, based on reflect_browser_action_node, whether we should proceed to next plan goal or continue doing this one"""
+    return "proceed_with_next" if state.get("current_plan_goal_achieved") else "continue_current"
+
+# def should_seek_confirmation(state: AgentState) -> Literal["confirm", "verify"]:
     """
     Decide whether to seek user confirmation or proceed to verification.
     
@@ -58,18 +46,12 @@ def should_seek_confirmation(state: AgentState) -> Literal["confirm", "verify"]:
         
     Returns:
         Next node name
-    """
-    pending = state.get("pending_confirmation")
-    
-    # TODO: Check if confirmation is pending
-    # TODO: Return "confirm" if confirmation needed, "verify" otherwise
-    
-    if pending:
+    """   
+    if state.get("pending_confirmation", None):
         return "confirm"
     return "verify"
 
-
-def should_retry_or_abort(state: AgentState) -> Literal["execute", "finalize"]:
+# def should_retry_or_abort(state: AgentState) -> Literal["execute", "finalize"]:
     """
     Decide whether to retry after error or abort task.
     
@@ -90,8 +72,7 @@ def should_retry_or_abort(state: AgentState) -> Literal["execute", "finalize"]:
         return "execute"
     return "finalize"
 
-
-def should_handle_error(state: AgentState) -> Literal["error", "continue"]:
+# def should_handle_error(state: AgentState) -> Literal["error", "continue"]:
     """
     Decide whether to handle error or continue to next action.
     
@@ -107,6 +88,7 @@ def should_handle_error(state: AgentState) -> Literal["error", "continue"]:
     
     return "continue"
 
+# Error handling is pending implementation
 
 def create_agent_graph() -> StateGraph:
     """
@@ -114,11 +96,11 @@ def create_agent_graph() -> StateGraph:
     
     The workflow:
     1. plan_task: Create task plan from user request
-    2. execute_action: Execute current action
-    3. verify_action: Verify action succeeded
-    4. (conditional) handle_error: If action failed, handle error
-    5. (conditional) seek_confirmation: If sensitive action, get user approval
-    6. (loop back to execute_action until all actions done)
+    2. choose_next_action: Chooses next action for achieving current plan goal
+    3. confirm_action: Check whether requires user confirmation and proceed if does
+    4. tool: calling tools and returning results
+    6. (loop back to choose_next_action until plan_goal achieved)
+    7. (loop back to choose_next_action until all plan_goals achieved)
     7. finalize: Wrap up and report results
     
     Returns:
@@ -129,53 +111,37 @@ def create_agent_graph() -> StateGraph:
     workflow = StateGraph(AgentState)
     
     workflow.add_node("plan", plan_task_node)
-    workflow.add_node("execute", execute_action_node)
-    workflow.add_node("verify", verify_action_node)
-    workflow.add_node("error", handle_error_node)
+    workflow.add_node("choose_action", choose_next_action_node)
     workflow.add_node("confirm", seek_confirmation_node)
+    workflow.add_node("reflect", reflect_browser_action_node)
+    workflow.add_node("tool", ToolNode)
     workflow.add_node("finalize", finalize_node)
+
+    # Dummy node for continue_check that just passes through
+    workflow.add_node("continue_check", lambda state: state)
     
     workflow.set_entry_point("plan")
     
-    workflow.add_edge("plan", "execute")
+    workflow.add_edge("plan", "choose_action")
+    workflow.add_edge("choose_action", "confirm")
     
     workflow.add_conditional_edges(
-        "execute",
-        should_seek_confirmation,
+        "confirm",
+        user_confirmed_action,
         {
-            "confirm": "confirm",
-            "verify": "verify",
+            "confirmed": "tool",
+            "rejected": "reflect",
         }
     )
     
-    workflow.add_edge("confirm", "verify")
+    workflow.add_edge("tool", "reflect")
+    workflow.add_edge("reflect", "choose_action")   
     
     workflow.add_conditional_edges(
-        "verify",
-        should_handle_error,
-        {
-            "error": "error",
-            "continue": "continue_check",
-        }
-    )
-    
-    workflow.add_conditional_edges(
-        "error",
-        should_retry_or_abort,
-        {
-            "execute": "execute",
-            "finalize": "finalize",
-        }
-    )
-    
-    # Add a dummy node for continue_check that just passes through
-    workflow.add_node("continue_check", lambda state: state)
-    
-    workflow.add_conditional_edges(
-        "continue_check",
+        "reflect",
         should_continue_execution,
         {
-            "execute": "execute",
+            "continue": "choose_action",
             "finalize": "finalize",
         }
     )
