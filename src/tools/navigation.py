@@ -1,10 +1,11 @@
-from typing import Type
+from typing import Any, Dict, List
 import json
 
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from browser.manager import BrowserManager
 from utils.logger import logger
+from utils.a11y_tree import find_working_node, extract_information_blocks
 from services.tools_cache_manager import ElementsCacheManager
 
 
@@ -176,23 +177,11 @@ class SearchGoogleTool(BaseTool):
             try:
                 accessibility_tree = page.accessibility.snapshot()
                 
-                if not accessibility_tree:
-                    return "Error: Could not get accessibility tree"
+                results = self._extract_search_results_from_tree(accessibility_tree)
                 
-                # Find the main content area
-                results = self._extract_search_results_from_tree(accessibility_tree, query)
-                
-                if not results:
-                    # Fallback: try to extract from DOM
-                    results = self._extract_search_results_from_dom(page)
-                
-                # Limit to 7 results
                 results = results[:7]
                 
                 logger.info(f"Extracted {len(results)} search results")
-                
-                if not results:
-                    return "No search results found"
                 
                 return json.dumps(results, indent=2)
                 
@@ -204,105 +193,14 @@ class SearchGoogleTool(BaseTool):
             logger.error(f"Error searching Google: {e}")
             return f"Error searching Google: {str(e)}"
     
-    def _extract_search_results_from_tree(self, tree_node: dict, query: str) -> list:
-        """Extract search results from accessibility tree."""
-        results = []
-        
-        def traverse(node, in_main=False):
-            role = node.get('role', '')
-            name = node.get('name', '')
-            
-            # Check if we're in the main content area
-            if role == 'main':
-                in_main = True
-            
-            # Look for links in main area that appear to be search results
-            if in_main and role == 'link' and name:
-                # Try to extract description from children or siblings
-                description = ""
-                
-                # Check if parent has more info
-                children = node.get('children', [])
-                for child in children:
-                    child_name = child.get('name', '')
-                    if child_name and child_name != name:
-                        description = child_name[:50]
-                        break
-                
-                # Avoid duplicate results and filter out common navigation links
-                common_excludes = ['Images', 'Videos', 'News', 'Maps', 'Shopping', 
-                                 'More', 'Settings', 'Tools', 'Sign in', query]
-                
-                if name not in [r['title'] for r in results] and name not in common_excludes:
-                    results.append({
-                        'title': name,
-                        'link': node.get('value', '') or 'N/A',
-                        'description': description[:50] if description else 'No description available'
-                    })
-            
-            # Traverse children
-            for child in node.get('children', []):
-                traverse(child, in_main)
-        
-        traverse(tree_node)
-        return results
-    
-    def _extract_search_results_from_dom(self, page) -> list:
-        """Fallback: Extract search results from DOM."""
-        results = []
-        
-        try:
-            # Try different selectors for Google search results
-            result_selectors = [
-                'div.g',  # Classic result container
-                'div[data-sokoban-container]',  # New result format
-                'div.MjjYud',  # Another variant
-            ]
-            
-            for selector in result_selectors:
-                result_divs = page.locator(selector).all()
-                
-                if len(result_divs) > 0:
-                    for div in result_divs[:7]:
-                        try:
-                            # Extract title
-                            title_elem = div.locator('h3').first
-                            title = title_elem.inner_text() if title_elem.count() > 0 else "No title"
-                            
-                            # Extract link
-                            link_elem = div.locator('a').first
-                            link = link_elem.get_attribute('href') if link_elem.count() > 0 else "N/A"
-                            
-                            # Extract description
-                            desc_selectors = ['div.VwiC3b', 'div[style*="line-height"]', 'span', 'div']
-                            description = "No description available"
-                            
-                            for desc_sel in desc_selectors:
-                                desc_elem = div.locator(desc_sel).first
-                                if desc_elem.count() > 0:
-                                    desc_text = desc_elem.inner_text()
-                                    if desc_text and len(desc_text) > 20:
-                                        description = desc_text[:50]
-                                        break
-                            
-                            if title != "No title":
-                                results.append({
-                                    'title': title,
-                                    'link': link,
-                                    'description': description
-                                })
-                                
-                        except Exception as e:
-                            logger.debug(f"Error extracting result: {e}")
-                            continue
-                    
-                    if results:
-                        break
-            
-        except Exception as e:
-            logger.error(f"Error in DOM extraction: {e}")
-        
-        return results
+    @staticmethod
+    def _extract_search_results_from_tree(
+            tree_node: Dict[str, Any], 
+        ) -> List[Dict[str, Any]]:
+        node = find_working_node(tree_node)  # the one wil will search for actual results in
+        inf_blocks = extract_information_blocks(node)
+
+        pass
 
 
 def create_navigation_tools() -> list[BaseTool]:
@@ -316,6 +214,6 @@ def create_navigation_tools() -> list[BaseTool]:
         List of navigation tools
     """
     return [
-        SearchGoogleTool(),
+        # SearchGoogleTool(),  - usage is deprecated asunderdeveloped
         OpenPageTool(),
     ]
