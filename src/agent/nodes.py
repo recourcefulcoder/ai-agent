@@ -34,12 +34,10 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     
     tools = create_interaction_tools() + create_navigation_tools()
 
-    # Get LLM with tool binding
     llm = (
         get_llm_service()
         .get_main_llm()
         .with_structured_output(TaskPlan)
-        .bind_tools(tools)
     )
     
     messages = state.get("messages") + [HumanMessage(content=user_request)]
@@ -76,7 +74,7 @@ def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
         get_llm_service()
         .get_main_llm()
         .with_structured_output(BrowserActionSuggestion)
-        .bind_with_tools(tools)
+        
     )
 
     response = llm.invoke(state.get("messages"))
@@ -163,6 +161,23 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
         "user_confirmed": True,
     }
 
+
+def perform_action_node(state: AgentState) -> Dict[str, Any]:
+
+    tools = create_interaction_tools() + create_navigation_tools()
+    llm = (
+        get_llm_service()
+        .get_main_llm()
+        .bind_tools(tools)
+    )
+
+    goal = state.get("task_plan").steps[state.get("current_plan_step_ind")]
+    goal = f"execute this task step: {goal}"
+    context = state.get("current_plan_step_messages") + [SystemMessage(content=goal)]
+
+    llm.invoke(context)
+    
+    return None
 
 def finalize_node(state: AgentState) -> Dict[str, Any]:
     """

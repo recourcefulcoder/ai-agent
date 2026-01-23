@@ -7,6 +7,7 @@ from agent.nodes import (
     choose_next_action_node,
     reflect_browser_action_node,
     seek_confirmation_node,
+    perform_action_node,
     finalize_node,
 )
 from utils.logger import logger
@@ -118,7 +119,7 @@ def create_agent_graph() -> StateGraph:
     workflow.add_node("choose_action", choose_next_action_node)
     workflow.add_node("confirm", seek_confirmation_node)
     workflow.add_node("reflect", reflect_browser_action_node)
-    workflow.add_node("tools", ToolNode(tools))
+    workflow.add_node("perform_action", perform_action_node)
     workflow.add_node("finalize", finalize_node)
 
     # Dummy node for continue_check that just passes through
@@ -133,12 +134,12 @@ def create_agent_graph() -> StateGraph:
         "confirm",
         user_confirmed_action,
         {
-            "confirmed": "tools",
+            "confirmed": "perform_action",
             "rejected": "reflect",
         }
     )
     
-    workflow.add_edge("tools", "reflect")
+    workflow.add_edge("perform_action", "reflect")
     workflow.add_edge("reflect", "choose_action")   
     
     workflow.add_conditional_edges(

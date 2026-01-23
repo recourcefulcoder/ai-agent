@@ -42,9 +42,6 @@ chromium --remote-debugging-port=9222
 # Run the agent
 python src/main.py "Check my calendar and schedule a meeting with Sara for next weekend"
 
-# With debug mode
-python src/main.py "Order pizza from my favorite place" --debug
-
 # Interactive mode
 python src/main.py --interactive
 ```

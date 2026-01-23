@@ -5,7 +5,7 @@ from utils.logger import logger
 
 
 class Singleton(type):
-    _instances = set()
+    _instances = dict()
 
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:
