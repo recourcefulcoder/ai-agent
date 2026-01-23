@@ -10,6 +10,8 @@ from agent.nodes import (
     finalize_node,
 )
 from utils.logger import logger
+from tools.interaction import create_interaction_tools
+from tools.navigation import create_navigation_tools
 
 
 def should_continue_execution(state: AgentState) -> Literal["continue", "finalize"]:
@@ -109,12 +111,14 @@ def create_agent_graph() -> StateGraph:
     logger.info("Creating agent graph...")
     
     workflow = StateGraph(AgentState)
+
+    tools = create_navigation_tools() + create_interaction_tools()
     
     workflow.add_node("plan", plan_task_node)
     workflow.add_node("choose_action", choose_next_action_node)
     workflow.add_node("confirm", seek_confirmation_node)
     workflow.add_node("reflect", reflect_browser_action_node)
-    workflow.add_node("tool", ToolNode)
+    workflow.add_node("tools", ToolNode(tools))
     workflow.add_node("finalize", finalize_node)
 
     # Dummy node for continue_check that just passes through
@@ -129,12 +133,12 @@ def create_agent_graph() -> StateGraph:
         "confirm",
         user_confirmed_action,
         {
-            "confirmed": "tool",
+            "confirmed": "tools",
             "rejected": "reflect",
         }
     )
     
-    workflow.add_edge("tool", "reflect")
+    workflow.add_edge("tools", "reflect")
     workflow.add_edge("reflect", "choose_action")   
     
     workflow.add_conditional_edges(

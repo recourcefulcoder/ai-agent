@@ -1,7 +1,3 @@
-"""
-Pydantic models for task planning and execution.
-"""
-
 from enum import Enum
 from typing import Optional, List
 from pydantic import BaseModel, Field
@@ -19,6 +15,18 @@ class ActionType(str, Enum):
     REQUEST_CONFIRMATION = "request_confirmation"
 
 
+class BrowserActionSuggestion(BaseModel):
+    """Represent chose-action node's suggestion on what action on browser should it perform to achieve the goal"""
+    description: str = Field(
+        default=None,
+        description="What do you want to do on the browser page",
+    )
+    reasoning: str = Field(
+        default=None,
+        description="Reasoning - why this action is being performed"
+    )
+
+
 class BrowserAction(BaseModel):
     """
     Represents a single browser action to be performed.
@@ -32,7 +40,7 @@ class BrowserAction(BaseModel):
     )
     value: Optional[str] = Field(
         default=None,
-        description="Value to type in"
+        description="Value to type in, if needed"
     )
     reason: str = Field(
         description="Why this action is being performed"

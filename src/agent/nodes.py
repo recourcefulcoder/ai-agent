@@ -5,7 +5,7 @@ from rich.panel import Panel
 from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
 
 from agent.state import AgentState
-from models.task import TaskPlan, BrowserAction, ExecutionResult
+from models.task import TaskPlan, BrowserActionSuggestion
 from utils.logger import logger
 from services.llm import get_llm_service
 from tools.interaction import create_interaction_tools
@@ -31,11 +31,14 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     
     user_request = state.get("user_request")
     
+    tools = create_interaction_tools() + create_navigation_tools()
+
     # Get LLM with tool binding
     llm = (
         get_llm_service()
         .get_main_llm()
         .with_structured_output(TaskPlan)
+        .bind_tools(tools)
     )
     
     messages = state["messages"] + [HumanMessage(content=user_request)]
@@ -46,13 +49,14 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     
     return {
         "task_plan": response,
+        "current_plan_goal": response.steps[0],
         "messages": messages + [response],
     }
 
 
 def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
     """
-    Execution node: Decides what BrowserAction should be taken next o achieve current plan goal
+    Execution node: Decides what browser action should be taken next to achieve current plan goal
     
     This node uses the LLM with tools to decide and what BrowserAction to perform, updates 
     state with "current browser action" 
@@ -65,27 +69,20 @@ def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
         Updated state with execution result
     """
     logger.info("Executing action...")
+
+    tools = create_navigation_tools() + create_interaction_tools()
+    llm = (
+        get_llm_service()
+        .get_main_llm()
+        .with_structured_output(BrowserActionSuggestion)
+        .bind_with_tools(tools)
+    )
+
+    response = llm.invoke(state.get("messages"))
     
-    messages = state["messages"]
-    
-    # if messages and hasattr(messages[-1], 'tool_calls') and messages[-1].tool_calls:
-    #     result = tool_node(state)
-    #     return result
-    # else:
-    #     llm = (
-    #         get_llm_service()
-    #         .get_main_llm()
-    #         .with_structured_output(ExecutionResult)
-    #     )
-    #     tools = create_interaction_tools() + create_navigation_tools()
-    #     llm_with_tools = llm.bind_tools(tools)
-        
-    #     response = llm_with_tools.invoke(messages)
-        
-    #     return {
-    #         "messages": [response],
-    #     }
-    return dict()
+    return {
+        "current_action": response,
+    }
 
 
 def reflect_browser_action_node(state: AgentState):
@@ -94,6 +91,9 @@ def reflect_browser_action_node(state: AgentState):
     and sets 'current_plan_goal' with relevant for now; if task completed, sets current_plan_goal to None"""
     pass
 
+
+def decide_action_danger_node(state: AgentState):
+    pass
 
 def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     """

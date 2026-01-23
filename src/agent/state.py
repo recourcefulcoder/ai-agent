@@ -3,7 +3,7 @@ from typing_extensions import TypedDict
 
 from langgraph.graph import add_messages
 from langchain_core.messages import SystemMessage,AIMessage, HumanMessage
-from models.task import TaskPlan, ExecutionResult, BrowserAction
+from models.task import TaskPlan, ExecutionResult, BrowserActionSuggestion
 from browser.manager import BrowserManager
 
 from config.settings import settings
@@ -17,8 +17,7 @@ class AgentState(TypedDict):
 
     current_plan_goal: Optional[str]
     current_plan_goal_achieved: bool
-    current_action: Optional[BrowserAction]
-    current_action_index: int
+    current_action: Optional[BrowserActionSuggestion]
     
     execution_results: List[ExecutionResult]
     browser_manager: BrowserManager
@@ -44,7 +43,6 @@ def create_initial_state(user_request: str) -> AgentState:
         current_plan_goal=None,
         current_plan_goal_achieved=False,
         current_action=None,
-        current_action_index=0,
         execution_results=[],
         browser_manager=BrowserManager(),
         error_count=0,
