@@ -17,7 +17,7 @@ class Singleton(type):
 class BrowserManager(metaclass=Singleton):
     """
     Manages the lifecycle of a Playwright browser instance.
-    Connects to an existing Firefox browser session via CDP (Chrome DevTools Protocol).
+    Connects to an existing Chromium browser session via CDP (Chrome DevTools Protocol).
     """
     
     def __init__(self):
@@ -29,13 +29,13 @@ class BrowserManager(metaclass=Singleton):
     
     def start(self, cdp_url: str = "http://localhost:9222") -> Page:
         """
-        Connect to an existing Firefox browser and return the active page.
+        Connect to an existing Chromium browser and return the active page.
         
-        To start Firefox with remote debugging enabled, use:
-        firefox --remote-debugging-port=9222
+        To start Chromium with remote debugging enabled, use:
+        chromium --remote-debugging-port=9222
         
         Or for a specific profile:
-        firefox --remote-debugging-port=9222 --profile /path/to/profile
+        Chromium --remote-debugging-port=9222 --profile /path/to/profile
         
         Args:
             cdp_url: The CDP (Chrome DevTools Protocol) endpoint URL.
@@ -47,7 +47,7 @@ class BrowserManager(metaclass=Singleton):
         Raises:
             Exception: If connection fails or no pages are available
         """
-        logger.info(f"Connecting to existing Firefox browser at {cdp_url}...")
+        logger.info(f"Connecting to existing Chromium browser at {cdp_url}...")
         
         try:
             self._playwright = sync_playwright().start()
@@ -84,7 +84,7 @@ class BrowserManager(metaclass=Singleton):
             logger.error(f"Failed to connect to browser: {e}")
             self._cleanup()
             raise Exception(f"Could not connect to browser at {cdp_url}. "
-                          f"Make sure Firefox is running with: firefox --remote-debugging-port=9222") from e
+                          f"Make sure Chromium is running with: chromium --remote-debugging-port=9222") from e
     
     def stop(self) -> None:      
         self._cleanup()

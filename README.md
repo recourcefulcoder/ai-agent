@@ -24,7 +24,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Install Playwright browsers
-playwright install firefox
+playwright install chromium
 
 # Configure environment
 cp .env.example .env
@@ -34,8 +34,8 @@ cp .env.example .env
 ### Usage
 
 ```bash
-# Run firefox browser in debug modefor interactive agent mode
-firefox --remote-debugging-port=9222
+# Run chromium browser in debug modefor interactive agent mode
+chromium --remote-debugging-port=9222
 ```
 
 ```bash
