@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file="../.env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     
-    default_llm_model: str = "z_ai/z-ai/glm-4.5-air:free"
+    default_llm_model: str = "z-ai/glm-4.5-air:free"
     
     browser_headless: bool = False
     browser_slow_mo: int = 100

@@ -1,6 +1,5 @@
 from typing import Literal
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
 from agent.state import AgentState
 from agent.nodes import (
     plan_task_node,

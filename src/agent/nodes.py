@@ -49,8 +49,8 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     return {
         "task_plan": response,
         "current_plan_step_ind": 0,
-        "messages": messages + [response],
-        "current_plan_step_messages": messages + [response],
+        "messages": [response],
+        "current_plan_step_messages": [response],
     }
 
 
@@ -165,19 +165,28 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
 def perform_action_node(state: AgentState) -> Dict[str, Any]:
 
     tools = create_interaction_tools() + create_navigation_tools()
+    tools_by_name = {tool.name: tool for tool in tools}
     llm = (
         get_llm_service()
         .get_main_llm()
-        .bind_tools(tools)
+        .bind_tools(tools, tool_choice="auto")
     )
 
     goal = state.get("task_plan").steps[state.get("current_plan_step_ind")]
     goal = f"execute this task step: {goal}"
     context = state.get("current_plan_step_messages") + [SystemMessage(content=goal)]
 
-    llm.invoke(context)
+    answer = llm.invoke(context)
+    result = []
+    for tool_call in answer.tool_calls:
+        tool = tools_by_name[tool_call["name"]]
+        observation = tool.invoke(tool_call["args"])
+        result.append(ToolMessage(content=observation, tool_call_id=tool_call["id"]))
     
-    return None
+    return {
+        "messages": result
+    }
+    
 
 def finalize_node(state: AgentState) -> Dict[str, Any]:
     """
