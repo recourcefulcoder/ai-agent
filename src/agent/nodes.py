@@ -29,17 +29,18 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.info("Planning task...")
     
-    user_request = state["user_request"]
+    user_request = state.get("user_request")
     
     # Get LLM with tool binding
-    llm = get_llm_service().get_main_llm()
-    struct = llm.with_structured_output(TaskPlan)
-    tools = create_interaction_tools() + create_navigation_tools()
-    llm_with_tools = struct.bind_tools(tools)
+    llm = (
+        get_llm_service()
+        .get_main_llm()
+        .with_structured_output(TaskPlan)
+    )
     
     messages = state["messages"] + [HumanMessage(content=user_request)]
     
-    response = llm_with_tools.invoke(messages)
+    response = llm.invoke(messages)
     
     logger.info(f"Planning response received")
     

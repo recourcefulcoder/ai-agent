@@ -1,3 +1,4 @@
+from typing import Optional
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,6 +23,7 @@ class Settings(BaseSettings):
     max_retries: int = 3  # max agent task retires
     context_request_depth: int = 5  # defines how deep into 
     # parent blocks can agent go, requesting additional context on an element.
+    # max_task_steps: Optional[int] = None
     require_confirmation_for_sensitive: bool = True
     
     log_level: str = "INFO"

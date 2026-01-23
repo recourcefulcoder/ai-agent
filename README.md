@@ -2,14 +2,6 @@
 
 An intelligent AI agent that automates complex browser-based tasks through natural language commands.
 
-## Features
-
-- 🤖 Natural language task understanding and planning
-- 🌐 Automated web browser control via Playwright
-- 🧠 Multi-step reasoning with LangGraph
-- 🔒 Safety layer for sensitive operations
-- 💾 User preference management
-
 ## Quick Start
 
 ### Prerequisites

@@ -5,6 +5,7 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from langgraph.graph.state import CompiledStateGraph
+from langchain_core.messages import AIMessage, ToolMessage, AIMessageChunk
 
 from agent.graph import get_agent
 from agent.state import AgentState, create_initial_state
@@ -15,11 +16,10 @@ from utils.logger import setup_logger, logger
 console = Console()
 
 
-def run_task(
+def execute_task(
     task: str, 
     debug: bool = False,
     agent: Optional[CompiledStateGraph] = None,
-    initial_state: Optional[AgentState] = None,
 ) -> None:
     """
     Run a single task with the agent.
@@ -40,18 +40,23 @@ def run_task(
     try:
         if agent is None:
             agent = get_agent()
-        if initial_state is None:
-            initial_state = create_initial_state(task)
+        initial_state = create_initial_state(task)
         
         # Invoke the agent graph
         logger.info("Starting agent execution...")
         
         final_state = None
         step_count = 0
-        max_steps = 20
         
-        for event in agent.stream(initial_state, {"recursion_limit": max_steps}):
+        for chunk, metadata in agent.stream(
+            initial_state, 
+            stream_mode="messages",
+        ):
             step_count += 1
+
+            if isinstance(chunk, AIMessageChunk):
+                if chunk.content:
+                    print(chunk.content, end="", flush=True)
             
             # Show progress
             for node_name, node_output in event.items():
@@ -64,9 +69,9 @@ def run_task(
                         for msg in messages:
                             if hasattr(msg, 'content') and msg.content:
                                 # Only show tool messages and important AI responses
-                                if msg.__class__.__name__ == "ToolMessage":
+                                if type(msg) == ToolMessage:
                                     console.print(f"[dim]→ {str(msg.content)[:200]}...[/dim]")
-                                elif msg.__class__.__name__ == "AIMessage" :
+                                elif type(msg) == AIMessage:
                                     #  and not hasattr(msg, 'tool_calls')
                                     console.print(f"[cyan]AI: {str(msg.content)[:200]}...[/cyan]")
             
@@ -106,7 +111,6 @@ def interactive_mode(debug: bool = False) -> None:
     ))
     
     agent = get_agent()
-    initial_state = create_initial_state(task)
     try:
         while True:
             task = console.input("\n[bold cyan]Enter your task:[/bold cyan] ")
@@ -117,11 +121,10 @@ def interactive_mode(debug: bool = False) -> None:
             if not task.strip():
                 continue
             
-            run_task(
+            execute_task(
                 task, 
                 debug,
-                agent,
-                initial_state
+                agent
             )
     
     finally:
@@ -151,7 +154,7 @@ def main(task: str, debug: bool, interactive: bool):
     if interactive:
         interactive_mode(debug)
     else:
-        run_task(task, debug)
+        execute_task(task, debug)
 
 
 if __name__ == "__main__":
