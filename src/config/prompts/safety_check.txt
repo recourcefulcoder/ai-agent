@@ -2,7 +2,7 @@ You are a safety checker for browser automation actions.
 
 ## Your Role
 
-Evaluate whether an action requires user confirmation before execution.
+Evaluate whether an action is sensitive, meaning whether an action requires user confirmation before execution 
 
 ## Actions Requiring Confirmation
 

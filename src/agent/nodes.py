@@ -5,7 +5,7 @@ from rich.panel import Panel
 from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
 
 from agent.state import AgentState
-from models.task import TaskPlan, BrowserActionSuggestion
+from models.task import TaskPlan, BrowserActionSuggestion, DangerCheck
 from utils.logger import logger
 from services.llm import get_llm_service
 from tools.interaction import create_interaction_tools
@@ -58,9 +58,8 @@ def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
     """
     Execution node: Decides what browser action should be taken next to achieve current plan goal
     
-    This node uses the LLM with tools to decide and what BrowserAction to perform, updates 
+    This node uses the LLM with tools to decide and what browser action to perform, updates 
     state with "current browser action" 
-    IMPORTANT: This node decides whether action is sensitive or not! It sets 'pending_confirmation'!
     
     Args:
         state: Current agent state
@@ -91,13 +90,9 @@ def reflect_browser_action_node(state: AgentState):
     and sets 'current_plan_goal' with relevant for now; if task completed, sets current_plan_goal to None"""
     pass
 
-
-def decide_action_danger_node(state: AgentState):
-    pass
-
 def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     """
-    Confirmation node: Requests user confirmation for sensitive actions.
+    Confirmation node: Decides whether action is sensitive or not and requests user confirmation for sensitive ones.
     
     This node displays a confirmation request and waits for user input.
     
@@ -110,11 +105,20 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     logger.info("Seeking user confirmation...")
     
     console = Console()
-    pending = state.get("pending_confirmation", "")
+    action_to_check = state.get("current_action")
+    is_sensitive = False
     
-    if pending:
+    llm = (
+        get_llm_service()
+        .get_main_llm()
+        .with_structured_output(DangerCheck)
+    )
+
+    is_sensitive = llm.invoke(state.current_action.description)
+
+    if is_sensitive:
         console.print(Panel(
-            f"[bold yellow]Confirmation Required[/bold yellow]\n\n{pending}",
+            f"[bold yellow]Confirmation Required[/bold yellow]\n\n{action_to_check.description}",
             border_style="yellow"
         ))
         
@@ -127,12 +131,10 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
         
         return {
             "user_confirmed": confirmed,
-            "pending_confirmation": None,
         }
     
     return {
         "user_confirmed": True,
-        "pending_confirmation": None,
     }
 
 

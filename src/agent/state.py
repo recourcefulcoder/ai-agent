@@ -3,7 +3,7 @@ from typing_extensions import TypedDict
 
 from langgraph.graph import add_messages
 from langchain_core.messages import SystemMessage,AIMessage, HumanMessage
-from models.task import TaskPlan, ExecutionResult, BrowserActionSuggestion
+from models.task import TaskPlan, BrowserActionSuggestion
 from browser.manager import BrowserManager
 
 from config.settings import settings
@@ -19,13 +19,12 @@ class AgentState(TypedDict):
     current_plan_goal_achieved: bool
     current_action: Optional[BrowserActionSuggestion]
     
-    execution_results: List[ExecutionResult]
+    # execution_results: List[ExecutionResult]
     browser_manager: BrowserManager
     
     error_count: int
     last_error: Optional[str]
     
-    pending_confirmation: Optional[str]
     user_confirmed: bool
     
     final_message: Optional[str]

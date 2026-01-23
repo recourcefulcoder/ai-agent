@@ -30,7 +30,7 @@ def should_continue_execution(state: AgentState) -> Literal["continue", "finaliz
     return "continue"
 
 def user_confirmed_action(state: AgentState) -> Literal["confirmed", "rejected"]:
-    """Checks whether current BrowserAction was confirmed by user or not"""
+    """Checks whether current browser action was confirmed by user or not"""
     if state.get("user_confirmed"):
         return "confirmed"
     return "rejected"
