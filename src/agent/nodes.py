@@ -50,8 +50,9 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     
     return {
         "task_plan": response,
-        "current_plan_goal": response.steps[0],
+        "current_plan_step_ind": 0,
         "messages": messages + [response],
+        "current_plan_step_messages": messages + [response],
     }
 
 
@@ -88,8 +89,27 @@ def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
 def reflect_browser_action_node(state: AgentState):
     """Validates current state of current plan goal - is succeded? 
     updates "current_goal_achieved" with True or False 
-    and sets 'current_plan_goal' with relevant for now; if task completed, sets current_plan_goal to None"""
-    pass
+    and sets 'current_plan_step_ind' with relevant for now; if task completed, sets current_plan_step_ind to None"""
+    llm = (
+        get_llm_service()
+        .get_main_llm()
+        .with_structured_output(BrowserActionSuggestion)
+    )
+
+    goal = state.get("task_plan").steps[state.get("current_plan_step_ind")]
+    goal = f"current goal is: {goal}"
+    context = state.get("current_plan_step_messages") + [SystemMessage(content=goal)]
+
+    decision = llm.invoke(context)
+    if decision.is_achieved:
+        return {
+            "current_plan_step_achieved": True,
+            "current_plan_step_messages": [],
+            "current_plan_step_ind": None,
+        }
+    return {
+        "current_plan_step_achieved": False,
+    }
 
 def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     """
