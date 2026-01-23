@@ -40,14 +40,42 @@ def run_task(
     try:
         if agent is None:
             agent = get_agent()
+        if initial_state is None:
             initial_state = create_initial_state(task)
         
-        # TODO: Stream or invoke the graph with initial state
-        # TODO: Handle intermediate outputs (show progress)
-        # TODO: Get final state
+        # Invoke the agent graph
+        logger.info("Starting agent execution...")
         
-        final_state = None  
+        final_state = None
+        step_count = 0
+        max_steps = 20
         
+        for event in agent.stream(initial_state, {"recursion_limit": max_steps}):
+            step_count += 1
+            
+            # Show progress
+            for node_name, node_output in event.items():
+                logger.debug(f"Node {node_name} executed")
+                
+                # Show messages from tools
+                if "messages" in node_output:
+                    messages = node_output["messages"]
+                    if messages:
+                        for msg in messages:
+                            if hasattr(msg, 'content') and msg.content:
+                                # Only show tool messages and important AI responses
+                                if msg.__class__.__name__ == "ToolMessage":
+                                    console.print(f"[dim]→ {str(msg.content)[:200]}...[/dim]")
+                                elif msg.__class__.__name__ == "AIMessage" :
+                                    #  and not hasattr(msg, 'tool_calls')
+                                    console.print(f"[cyan]AI: {str(msg.content)[:200]}...[/cyan]")
+            
+            if event:
+                final_state = list(event.values())[0]
+        
+        logger.info(f"Agent execution completed after {step_count} steps")
+        
+        # Display final result
         if final_state and final_state.get("success"):
             console.print(Panel(
                 final_state.get("final_message", "Task completed!"),

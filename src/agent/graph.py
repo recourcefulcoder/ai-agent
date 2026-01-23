@@ -22,15 +22,30 @@ def should_continue_execution(state: AgentState) -> Literal["execute", "finalize
     Returns:
         Next node name
     """
-    task_plan = state.get("task_plan")
-    current_index = state.get("current_action_index", 0)
+    messages = state.get("messages", [])
     
-    # TODO: Check if there are more actions to execute
-    # TODO: Check if max errors exceeded
-    # TODO: Return "execute" if more actions, "finalize" if done
+    # Check if we've exceeded max errors
+    if state.get("error_count", 0) >= 3:
+        return "finalize"
     
-    if task_plan and current_index < len(task_plan.steps):
+    # Check if last message has tool calls (more work to do)
+    if messages and hasattr(messages[-1], 'tool_calls') and messages[-1].tool_calls:
         return "execute"
+    
+    # Check if last message indicates completion
+    if messages and hasattr(messages[-1], 'content'):
+        content = str(messages[-1].content).lower()
+        completion_phrases = [
+            "task completed", "task is complete", "finished", 
+            "done", "successfully completed", "all set"
+        ]
+        if any(phrase in content for phrase in completion_phrases):
+            return "finalize"
+    
+    # Continue if we haven't done much yet
+    if len(messages) < 10:
+        return "execute"
+    
     return "finalize"
 
 
@@ -86,18 +101,10 @@ def should_handle_error(state: AgentState) -> Literal["error", "continue"]:
     Returns:
         Next node name
     """
-    execution_results = state.get("execution_results", [])
-    
-    if not execution_results:
-        return "continue"
-    
-    last_result = execution_results[-1]
-    
-    # TODO: Check if last action failed
-    # TODO: Return "error" if failed, "continue" if succeeded
-    
-    if not last_result.success:
+    # Check if we just encountered an error
+    if state.get("last_error"):
         return "error"
+    
     return "continue"
 
 

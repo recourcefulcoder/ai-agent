@@ -13,9 +13,9 @@ class ActionType(str, Enum):
     SEARCH = "search"
     CLICK = "click"
     TYPE = "type"
-    EXTRACT = "extract"
+    # EXTRACT = "extract"
     WAIT = "wait"
-    ANALYZE_PAGE = "analyze_page"
+    # ANALYZE_PAGE = "analyze_page"
     REQUEST_CONFIRMATION = "request_confirmation"
 
 
@@ -32,7 +32,7 @@ class BrowserAction(BaseModel):
     )
     value: Optional[str] = Field(
         default=None,
-        description="Value to type or search for"
+        description="Value to type in"
     )
     reason: str = Field(
         description="Why this action is being performed"
@@ -99,9 +99,6 @@ class ExecutionResult(BaseModel):
 
 
 class TaskResult(BaseModel):
-    """
-    Final result of task execution.
-    """
     success: bool = Field(
         description="Whether the overall task succeeded"
     )
