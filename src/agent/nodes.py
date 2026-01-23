@@ -178,7 +178,7 @@ def finalize_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.info("Finalizing task...")
     
-    messages = state["messages"]
+    messages = state.get("messages")
     error_count = state.get("error_count", 0)
     
     # Check if there were too many errors
@@ -188,19 +188,18 @@ def finalize_node(state: AgentState) -> Dict[str, Any]:
             "final_message": f"Task failed after {error_count} errors. Please try again or rephrase your request.",
         }
     
-    # Summarize based on messages
-    if messages:
-        last_msg = messages[-1]
-        if hasattr(last_msg, 'content'):
-            content = str(last_msg.content)
+    # # Summarize based on messages
+    # if messages:
+    #     last_msg = messages[-1]
+    #     if hasattr(last_msg, 'content'):
+    #         content = str(last_msg.content)
             
-            # Check if task seems complete
-            completion_indicators = ["completed", "done", "finished", "success"]
-            if any(indicator in content.lower() for indicator in completion_indicators):
-                return {
-                    "success": True,
-                    "final_message": "Task completed successfully!",
-                }
+    #         completion_indicators = ["completed", "done", "finished", "success"]
+    #         if any(indicator in content.lower() for indicator in completion_indicators):
+    #             return {
+    #                 "success": True,
+    #                 "final_message": "Task completed successfully!",
+    #             }
     
     return {
         "success": True,
