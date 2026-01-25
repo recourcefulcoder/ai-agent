@@ -180,6 +180,10 @@ class BrowserManager(metaclass=Singleton):
     def current_page(self) -> Optional[Page]:
         return self._current_page
     
+    @current_page.setter
+    def current_page(self, page: Page) -> None:
+        self._current_page = page
+    
     @property
     def current_url(self) -> Optional[str]:
         if self._current_page:

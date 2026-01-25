@@ -43,7 +43,9 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     response = llm.invoke(messages)
     response_msg = AIMessage(content=str(response))
     
-    logger.info(f"Planning response received")
+    logger.info(f"Planning response received; steps are:")
+    for step in response.steps:
+        logger.info(f"{step}")
     
     return {
         "task_plan": response,
@@ -51,7 +53,6 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
         "messages": [response_msg],
         "current_plan_step_messages": [response_msg],
     }
-
 
 def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
     """
@@ -68,20 +69,19 @@ def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.info("Executing action...")
 
-    tools = create_navigation_tools() + create_interaction_tools()
     llm = (
         get_llm_service()
         .get_main_llm()
-        .with_structured_output(BrowserActionSuggestion)
-        
+        .with_structured_output(BrowserActionSuggestion)        
     )
+
+    logger.info(f"{state.get('messages')}")
 
     response = llm.invoke(state.get("messages"))
     
     return {
         "current_action": response,
     }
-
 
 def reflect_browser_action_node(state: AgentState):
     """Validates current state of current plan goal - is succeded? 
@@ -93,20 +93,21 @@ def reflect_browser_action_node(state: AgentState):
         .with_structured_output(PlanGoalAchieved)
     )
 
-    goal = state.get("task_plan").steps[state.get("current_plan_step_ind")]
+    step_ind = state.get("current_plan_step_ind")
+    goal = state.get("task_plan").steps[step_ind]
     goal = f"current goal is: {goal}"
     context = state.get("current_plan_step_messages") + [SystemMessage(content=goal)]
 
     decision = llm.invoke(context)
     if decision.is_achieved:
         return {
-            "current_plan_step_achieved": True,
+            "messages": [SystemMessage(
+                content="goal for current plan step is achieved, proceeding with next step"
+            )],
             "current_plan_step_messages": [],
-            "current_plan_step_ind": None,
+            "current_plan_step_ind": step_ind + 1,
         }
-    return {
-        "current_plan_step_achieved": False,
-    }
+    return {}
 
 def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     """
@@ -160,8 +161,7 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
         "user_confirmed": True,
     }
 
-
-def perform_action_node(state: AgentState) -> Dict[str, Any]:
+async def perform_action_node(state: AgentState) -> Dict[str, Any]:
 
     tools = create_interaction_tools() + create_navigation_tools()
     tools_by_name = {tool.name: tool for tool in tools}
@@ -171,22 +171,22 @@ def perform_action_node(state: AgentState) -> Dict[str, Any]:
         .bind_tools(tools, tool_choice="auto")
     )
 
-    goal = state.get("task_plan").steps[state.get("current_plan_step_ind")]
-    goal = f"execute this task step: {goal}"
-    context = state.get("current_plan_step_messages") + [SystemMessage(content=goal)]
+    goal = f"execute this task step: {state.get('current_action').description}"
+    sys_msg = SystemMessage(content=goal)
+    context = state.get("current_plan_step_messages") + [sys_msg]
 
     answer = llm.invoke(context)
-    result = []
+    result = [answer]
     for tool_call in answer.tool_calls:
         tool = tools_by_name[tool_call["name"]]
-        observation = tool.invoke(tool_call["args"])
+        observation = await tool.ainvoke(tool_call["args"])
         result.append(ToolMessage(content=observation, tool_call_id=tool_call["id"]))
     
     return {
-        "messages": result
+        "messages": result,
+        "current_plan_step_messages": context + result
     }
     
-
 def finalize_node(state: AgentState) -> Dict[str, Any]:
     """
     Finalization node: Wraps up task execution and reports results.

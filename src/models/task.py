@@ -36,7 +36,7 @@ class BrowserActionSuggestion(BaseModel):
 class DangerCheck(BaseModel):
     is_sensitive: bool = Field(
         default=False,
-        descrpition="Answer to thequestion whether suggested action is sensitive"
+        descrpition="Answer to whether suggested action is dangerous (i.e. sensitive); true if it is, false if it isn't"
     )
 
 class PlanGoalAchieved(BaseModel):

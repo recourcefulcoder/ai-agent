@@ -50,7 +50,7 @@ async def execute_task(
         final_state = None
         step_count = 0
         
-        for chunk, metadata in agent.stream(
+        async for chunk, _ in agent.astream(
             initial_state, 
             stream_mode="messages",
         ):

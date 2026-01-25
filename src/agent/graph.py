@@ -24,7 +24,7 @@ def should_continue_execution(state: AgentState) -> Literal["continue", "finaliz
     Returns:
         Next node name
     """
-    if state.get("current_plan_goal") is None:
+    if state.get("current_plan_step_ind") == len(state.get("task_plan").steps):
         return "finalize"
     
     return "continue"

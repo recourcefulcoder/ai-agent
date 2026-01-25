@@ -1,8 +1,3 @@
-"""
-Smart element location using various strategies.
-Helps find elements by text, role, semantic meaning, etc.
-"""
-
 from typing import Any, Dict, Optional, List
 from playwright.async_api import Page, Locator
 from utils.logger import logger
@@ -58,10 +53,10 @@ class ElementLocator:
     def __init__(self):
         pass
 
-    def list_informative_elements(self, page: Page) -> List[Dict[str, Any]]:
+    async def list_informative_elements(self, page: Page) -> List[Dict[str, Any]]:
         logger.info("Extracting informative elements from accessibility tree...")
         
-        accessibility_tree = page.accessibility.snapshot()
+        accessibility_tree = await page.accessibility.snapshot()
         
         if not accessibility_tree:
             logger.warning("No accessibility tree available")
@@ -71,7 +66,7 @@ class ElementLocator:
         logger.info(f"Extracted {len(informative_elements)} informative elements")
         return informative_elements
     
-    def list_interactive_elements(self, page: Page) -> List[Dict[str, Any]]:
+    async def list_interactive_elements(self, page: Page) -> List[Dict[str, Any]]:
         """
         Get a list of all interactive elements on the page.
         Returns detailed information about each element.
@@ -103,30 +98,30 @@ class ElementLocator:
         
         for _, selector in self._interactive_selectors.items():
             try:
-                elements = page.locator(selector).all()
+                elements = await page.locator(selector).all()
                 
                 for element in elements:
                     try:
-                        if not element.is_visible() and not element.count():
+                        if not await element.is_visible() and not await element.count():
                             continue
                         
                         element_id_counter += 1
                         
-                        tag_name = element.evaluate('el => el.tagName.toLowerCase()')
-                        is_enabled = element.is_enabled() if tag_name in ['input', 'button', 'select', 'textarea'] else True
+                        tag_name = await element.evaluate('el => el.tagName.toLowerCase()')
+                        is_enabled = await element.is_enabled() if tag_name in ['input', 'button', 'select', 'textarea'] else True
                         
                         contents = ""
                         try:
                             if tag_name in ['input', 'textarea']:
-                                contents = element.input_value() or ""
+                                contents = await element.input_value() or ""
                             else:
-                                contents = element.inner_text()
+                                contents = await element.inner_text()
                                 if len(contents) > 200:
                                     contents = contents[:197] + "..."
                         except:
                             contents = ""
                         
-                        attributes = element.evaluate('''el => {
+                        attributes = await element.evaluate('''el => {
                             return {
                                 id: el.id || null,
                                 name: el.name || null,
@@ -145,12 +140,12 @@ class ElementLocator:
                         label = None
                         try:
                             if attributes.get('id'):
-                                label_element = page.locator(f'label[for="{attributes["id"]}"]')
-                                if label_element.count() > 0:
-                                    label = label_element.first.inner_text()
+                                label_element = await page.locator(f'label[for="{attributes["id"]}"]')
+                                if await label_element.count() > 0:
+                                    label = await label_element.first.inner_text()
                             
                             if not label and tag_name in ['input', 'textarea', 'select']:
-                                parent_label = element.evaluate('''el => {
+                                parent_label = await element.evaluate('''el => {
                                     const label = el.closest('label');
                                     return label ? label.innerText : null;
                                 }''')
@@ -159,7 +154,7 @@ class ElementLocator:
                         except:
                             pass
                         
-                        selector_str = self._generate_selector(element, attributes)
+                        selector_str = await self._generate_selector(element, attributes)
                         
                         element_info = {
                             "id": attributes.get('id'),
@@ -194,12 +189,12 @@ class ElementLocator:
         return interactive_elements
     
     @staticmethod
-    def _generate_selector(element: Locator, attributes: Dict[str, Any]) -> str:
+    async def _generate_selector(element: Locator, attributes: Dict[str, Any]) -> str:
         """
         Generate a stable CSS selector for an element.
         
         Args:
-            element: The Playwright locator
+            element: The Playwright async locator
             attributes: Dictionary of element attributes
             
         Returns:
@@ -209,7 +204,7 @@ class ElementLocator:
             return f"#{attributes['id']}"
         
         if attributes.get('name'):
-            tag_name = element.evaluate('el => el.tagName.toLowerCase()')
+            tag_name = await element.evaluate('el => el.tagName.toLowerCase()')
             return f"{tag_name}[name='{attributes['name']}']"
         
         return "unknown"

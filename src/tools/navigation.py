@@ -1,5 +1,7 @@
+import asyncio
 from typing import Any, Dict, List
 import json
+import threading
 
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -43,7 +45,6 @@ class OpenPageTool(BaseTool):
         """
         Navigate to the specified URL asynchronously.
         """
-        logger.info(f"Navigating to: {url}")
         
         page = self.browser_manager.current_page 
         if not page:
@@ -91,6 +92,7 @@ class OpenPageTool(BaseTool):
         Returns:
             Success message with page title and URL
         """
+        raise RuntimeError("SYNCHRONOUS VERSION WAS RUN")
         logger.info(f"Navigating to: {url}")
         
         page = self.browser_manager.current_page

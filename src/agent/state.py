@@ -16,8 +16,7 @@ class AgentState(TypedDict):
     task_plan: Optional[TaskPlan]
 
     current_plan_step_ind: Optional[int]
-    current_plan_step_messages: Annotated[List[AIMessage | SystemMessage] | None, add_messages]
-    current_plan_step_achieved: bool
+    current_plan_step_messages: Optional[List[AIMessage | SystemMessage]]
     current_action: Optional[BrowserActionSuggestion]
     
     # execution_results: List[ExecutionResult]
@@ -42,7 +41,6 @@ def create_initial_state(user_request: str) -> AgentState:
         task_plan=None,
         current_plan_step_ind=None,
         current_plan_step_messages=[],
-        current_plan_step_achieved=False,
         current_action=None,
         execution_results=[],
         browser_manager=BrowserManager(),

@@ -59,6 +59,77 @@ class ClickElementTool(BaseTool):
         exclude=True, 
         default_factory=BrowserManager,
     )
+
+    async def _arun(self, element_selector: str) -> str:
+        page = self.browser_manager.current_page
+        
+        if not page:
+            return "Error: Browser not connected. Use the browser manager to connect first."
+        
+        cache = ElementsCacheManager().get_cache(await page.url)
+
+        if cache is None or element_selector not in cache.keys():
+            return f"Error: Element with selector {element_selector} not found. Use 'get_interactive_elements' first to get the list of elements."
+        
+        element_info = cache.get(element_selector)
+        selector = element_info.get('selector')
+        
+        try:
+            element = page.locator(selector).first
+            
+            if await element.count() == 0:
+                return f"Error: Element with selector '{selector}' not found on the page. The page may have changed."
+            
+            if not await element.is_visible():
+                logger.warning(f"Element {element_selector} is not visible, attempting to scroll into view")
+                await element.scroll_into_view_if_needed()
+
+            result = f"Successfully clicked: {element_info.get('type')}"
+
+            # clear all update info before interaction
+            ElementsCacheManager().del_page_updates(page.url)
+
+            try:
+                async with await page.expect_popup(timeout=1000) as popup_info:
+                    await element.click()
+                popup = popup_info.value
+                await popup.wait_for_load_state("domcontentloaded")
+                self.browser_manager._current_page = popup
+                self.browser_manager._current_page.on(
+                    "domcontentlodaded", 
+                    ElementsCacheManager().track_dom_changes
+                )
+                logger.info(f"Opened new tab with URL: {popup.url}")
+                result += f"\nState change: Opened new tab with URL: {popup.url}"
+                return result
+                
+            except PlaywrightTimeoutError:
+                # No popup appeared, element was clicked on the same page
+                pass
+            
+            await self.browser_manager._current_page.wait_for_load_state()
+            
+            inter_updates = ElementsCacheManager().get_interactive_updates(page.url)
+            info_updates = ElementsCacheManager().get_info_updates(page.url)
+
+            if len(inter_updates.keys()) != 0:
+                result += f"\nState change: new interactive elements appeared on page; information on them lower:\n {'{'}"
+                for value in inter_updates.value():
+                    result += f"\n{value}, "
+                result += "\n}"
+            if len(info_updates.keys()) != 0:
+                result += f"\nState change: new informative elements appeared on page; information on them lower:\n {'{'}"
+                for value in info_updates.value():
+                    result += f"\n{value}, "
+                result += "\n}"
+            
+            logger.info(f"Click completed: {element_info.get('type')}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error clicking element {element_selector}: {e}")
+            return f"Error clicking element: {str(e)}"
+
     
     def _run(self, element_selector: str) -> str:
         """
@@ -159,6 +230,59 @@ class InputTextTool(BaseTool):
     )
     typing_delay: int = Field(default=50, exclude=True)  # Milliseconds between keystrokes
     
+    async def _arun(self, element_selector: str, text: str) -> str:
+        """
+        Type text into the element with the given ID.
+        
+        Args:
+            element_selector: The ID of the element to type into
+            text: The text to type
+            
+        Returns:
+            Success or error message
+        """
+        logger.info(f"Typing text into element {element_selector}: '{text[:50]}...'")
+        
+        page = self.browser_manager.current_page
+        
+        if not page:
+            return "Error: Browser not connected."
+        
+        cache = ElementsCacheManager().get_cache(page.url)
+
+        if cache is None or element_selector not in cache.keys():
+            return f"Error: Element ID {element_selector} not found. Use 'get_interactive_elements' first."
+        
+        element_info = cache.get(element_selector)
+        selector = element_info.get('selector')
+        
+        try:
+            # Locate the element
+            element = page.locator(selector).first
+            
+            if await element.count() == 0:
+                return f"Error: Element not found on the page."
+            
+            if not await element.is_visible():
+                await element.scroll_into_view_if_needed()
+            
+            await element.click()
+            time.sleep(0.2)
+            
+            await element.fill("")
+            time.sleep(0.1)
+            
+            await element.type(text, delay=self.typing_delay)
+            
+            logger.info(f"Successfully typed text into: {element_info.get('type')}")
+            
+            return f"Successfully typed text into: {element_info.get('label') or element_info.get('type', 'element')}"
+            
+        except Exception as e:
+            logger.error(f"Error typing into element {element_selector}: {e}")
+            return f"Error typing text: {str(e)}"
+
+
     def _run(self, element_selector: str, text: str) -> str:
         """
         Type text into the element with the given ID.
@@ -227,6 +351,90 @@ class GetElementContextTool(BaseTool):
         exclude=True, 
         default_factory=BrowserManager,
     )
+
+    async def _arun(self, element_selector: int) -> str:
+        """
+        Get contextual information about the element.
+        
+        Args:
+            element_selector: The ID of the element to get context for
+            
+        Returns:
+            Context information as a formatted string
+        """
+        logger.info(f"Getting context for element {element_selector}")
+        
+        page = self.browser_manager.current_page
+        cache = ElementsCacheManager().get_cache()
+        if not page:
+            return "Error: Browser not connected."
+        
+        if element_selector not in cache.keys():
+            return f"Error: Element ID {element_selector} not found."
+        
+        element_info = cache[element_selector]
+        selector = element_info['selector']
+        
+        try:
+            element = page.locator(selector).first
+            
+            if await element.count() == 0:
+                return "Error: Element not found on the page."
+            
+            text_substring_size = 200  # defines how much symbols of context text should 
+            # be passed to an agent
+
+            context_info = await element.evaluate('''(el) => {
+                const context = [];
+                let current = el.parentElement;
+                let level = 0;
+                const maxLevels = 5;
+                
+                while (current && level < maxLevels) {
+                    const text = current.innerText?.trim() || '';
+                    const hasText = text.length > 0;
+                    
+                    context.push({
+                        level: level + 1,
+                        tagName: current.tagName.toLowerCase(),
+                        id: current.id || null,
+                        className: current.className || null,
+                        text: hasText ? text.substring(0, 300) : null,
+                        hasText: hasText
+                    });
+                    
+                    if (hasText) break;
+                    
+                    current = current.parentElement;
+                    level++;
+                }
+                
+                return context;
+            }''')
+            
+            # Format the context information
+            result = f"Context for element {element_selector} ({element_info.get('type')}):\n\n"
+            result += f"Element: {element_info.get('label') or element_info.get('contents', 'N/A')}\n"
+            result += f"Selector: {selector}\n\n"
+            result += "Parent hierarchy:\n"
+            
+            for ctx in context_info:
+                result += f"\nLevel {ctx['level']}: <{ctx['tagName']}>"
+                if ctx['id']:
+                    result += f" id='{ctx['id']}'"
+                if ctx['className']:
+                    class_str = ctx['className'][:50]
+                    result += f" class='{class_str}...'" if len(ctx['className']) > 50 else f" class='{ctx['className']}'"
+                if ctx['text']:
+                    result += f"\n  Text: {ctx['text'][:text_substring_size]}..."
+                if ctx['hasText']:
+                    result += "\n  (Stopped: found text-containing block)"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting context for element {element_selector}: {e}")
+            return f"Error getting element context: {str(e)}"
     
     def _run(self, element_selector: int) -> str:
         """
@@ -330,6 +538,50 @@ class GetInteractiveElementsTool(BaseTool):
         default_factory=BrowserManager,
     )
     
+    async def _arun(self) -> str:
+        """
+        Get all interactive elements on the current page.
+        
+        Returns:
+            Formatted list of interactive elements
+        """
+        logger.info("Getting interactive elements from current page")
+        
+        page = self.browser_manager.current_page
+        if not page:
+            return "Error: Browser not connected."
+        
+        try:
+            elements = await ElementLocator().list_informative_elements(page)
+            
+            new_cache = dict()
+            for element in elements:
+                new_cache[element.get('selector')] = element
+            
+            ElementsCacheManager().set_interactive_cache(new_cache, page.url)
+            
+            if not elements:
+                return "No interactive elements found on the page."
+            
+            result = f"Found {len(elements)} interactive elements:\n\n"
+            
+            # Group by type for better readability
+            by_type: Dict[str, List[Dict]] = dict()
+            for elem in elements:
+                elem_type = elem.get('type', 'unknown')
+                if elem_type not in by_type:
+                    by_type[elem_type] = []
+                by_type[elem_type].append(elem)
+            
+            result += str(by_type) + f"\nTotal: {len(elements)} elements available for interaction"
+            
+            logger.info(f"Cached {len(elements)} elements")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting interactive elements: {e}")
+            return f"Error getting interactive elements: {str(e)}"
+
     def _run(self) -> str:
         """
         Get all interactive elements on the current page.
@@ -396,8 +648,52 @@ class GetInformativeElementsTool(BaseTool):
         default_factory=BrowserManager,
     )
 
-    def _arun(self) -> str:
-        pass
+    async def _arun(self) -> str:
+        """
+        Get all informative elements (i.e. containing some text 
+        information, vital for understanding page contents) on the current page.
+        
+        Returns:
+            Formatted list of interactive elements
+        """
+        logger.info("Getting interactive elements from current page")
+        
+        page = self.browser_manager.current_page
+        if not page:
+            return "Error: Browser not connected."
+        
+        try:
+
+            locator = ElementLocator()
+            elements = await locator.list_informative_elements(page)
+            
+            new_cache = dict()
+            for element in elements:
+                new_cache[element['id']] = element
+            
+            ElementsCacheManager().set_informative_cache(new_cache, page.url)
+            
+            if not elements:
+                return "No interactive elements found on the page."
+            
+            result = f"Found {len(elements)} interactive elements:\n\n"
+            
+            # Group by type for better readability
+            by_type: Dict[str, List[Dict]] = dict()
+            for elem in elements:
+                elem_type = elem.get('type', 'unknown')
+                if elem_type not in by_type:
+                    by_type[elem_type] = []
+                by_type[elem_type].append(elem)
+            
+            result += str(by_type) + f"\nTotal: {len(elements)} elements available for interaction"
+            
+            logger.info(f"Cached {len(elements)} elements")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting interactive elements: {e}")
+            return f"Error getting interactive elements: {str(e)}"
     
     def _run(self) -> str:
         """
