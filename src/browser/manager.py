@@ -1,5 +1,6 @@
 from typing import Optional, List
-from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Playwright
+# from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Playwright
+from playwright.async_api import async_playwright, Page, BrowserContext, Browser, Playwright
 from config.settings import settings
 from utils.logger import logger
 
@@ -25,9 +26,9 @@ class BrowserManager(metaclass=Singleton):
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._current_page: Optional[Page] = None
-        self.start()
+        self._started = False
     
-    def start(self, cdp_url: str = "http://localhost:9222") -> Page:
+    async def start(self, cdp_url: str = "http://localhost:9222") -> Page:
         """
         Connect to an existing Chromium browser and return the active page.
         
@@ -47,20 +48,22 @@ class BrowserManager(metaclass=Singleton):
         Raises:
             Exception: If connection fails or no pages are available
         """
+        if self._started:
+            return
         logger.info(f"Connecting to existing Chromium browser at {cdp_url}...")
         
         try:
-            self._playwright = sync_playwright().start()
+            self._playwright = await async_playwright().start()
             logger.debug("Playwright initialized")
             
-            self._browser = self._playwright.chromium.connect_over_cdp(cdp_url)
+            self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
             logger.info("Successfully connected to browser")
             
             contexts = self._browser.contexts
             
             if not contexts:
                 logger.warning("No browser contexts found, creating new context")
-                self._context = self._browser.new_context(
+                self._context = await self._browser.new_context(
                     viewport={'width': 1280, 'height': 720}
                 )
             else:
@@ -70,19 +73,19 @@ class BrowserManager(metaclass=Singleton):
             pages = self._context.pages
             
             if not pages:
-                self._current_page = self._context.new_page()
+                self._current_page = await self._context.new_page()
             else:
                 self._current_page = pages[-1]
             
             self._current_page.set_default_timeout(settings.browser_timeout)
             
             logger.info(f"Browser connection established. Current URL: {self._current_page.url}")
-            
+            self._started = True
             return self._current_page
             
         except Exception as e:
             logger.error(f"Failed to connect to browser: {e}")
-            self._cleanup()
+            await self._cleanup()
             raise Exception(f"Could not connect to browser at {cdp_url}. "
                           f"Make sure Chromium is running with: chromium --remote-debugging-port=9222") from e
     

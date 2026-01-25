@@ -1,4 +1,5 @@
 import sys
+import asyncio
 from typing import Optional
 
 import click
@@ -16,7 +17,7 @@ from utils.logger import setup_logger, logger
 console = Console()
 
 
-def execute_task(
+async def execute_task(
     task: str, 
     debug: bool = False,
     agent: Optional[CompiledStateGraph] = None,
@@ -30,6 +31,7 @@ def execute_task(
     """
     log_level = "DEBUG" if debug else settings.log_level
     setup_logger(log_level)
+    await BrowserManager().start()
     
     console.print(Panel.fit(
         f"[bold cyan]Task:[/bold cyan] {task}",
@@ -103,7 +105,7 @@ def execute_task(
         console.print(f"[red]Error: {str(e)}[/red]")
 
 
-def interactive_mode(debug: bool = False) -> None:
+async def interactive_mode(debug: bool = False) -> None:
     console.print(Panel(
         "[bold cyan]Browser AI Agent - Interactive Mode[/bold cyan]\n\n"
         "Enter tasks in natural language. Type 'exit' or 'quit' to stop.",
@@ -150,11 +152,11 @@ def main(task: str, debug: bool, interactive: bool):
     if not task and not interactive:
         console.print("[red]Error: Either provide a task or use --interactive mode[/red]")
         sys.exit(1)
-
+    
     if interactive:
-        interactive_mode(debug)
+        asyncio.run(interactive_mode(debug))
     else:
-        execute_task(task, debug)
+        asyncio.run(execute_task(task, debug))
 
 
 if __name__ == "__main__":

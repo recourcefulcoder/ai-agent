@@ -90,7 +90,7 @@ def reflect_browser_action_node(state: AgentState):
     llm = (
         get_llm_service()
         .get_main_llm()
-        .with_structured_output(BrowserActionSuggestion)
+        .with_structured_output(PlanGoalAchieved)
     )
 
     goal = state.get("task_plan").steps[state.get("current_plan_step_ind")]

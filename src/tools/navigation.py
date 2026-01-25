@@ -38,6 +38,48 @@ class OpenPageTool(BaseTool):
         exclude=True, 
         default_factory=BrowserManager,
     )
+
+    async def _arun(self, url: str) -> str:
+        """
+        Navigate to the specified URL asynchronously.
+        """
+        logger.info(f"Navigating to: {url}")
+        
+        page = self.browser_manager.current_page 
+        if not page:
+            return "Error: Browser not connected."
+        
+        if not url.startswith(('http://', 'https://')):
+            return "Error: URL must start with http:// or https://"
+        
+        try:
+            pages_map = {page.url: page for page in self.browser_manager._context.pages}
+
+            if url in pages_map:
+                opened_page = pages_map[url]
+            else:
+                # Playwright Async Context Manager
+                async with self.browser_manager._context.expect_page() as new_page_info:
+                    await page.evaluate('window.open("about:blank", "_blank")')
+                opened_page = await new_page_info.value
+                
+            await opened_page.bring_to_front()
+            self.browser_manager.current_page = opened_page
+            response = await opened_page.goto(
+                url, 
+                wait_until="domcontentloaded", 
+            )
+            title = await opened_page.title()
+            current_url = opened_page.url
+            
+            if response and response.status >= 400:
+                return f"Warning: Status {response.status}. URL: {current_url}"
+            
+            return f"Successfully opened: '{title}'"
+            
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            return f"Error opening page: {str(e)}"
     
     def _run(self, url: str) -> str:
         """
