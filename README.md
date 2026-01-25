@@ -7,7 +7,10 @@ An intelligent AI agent that automates complex browser-based tasks through natur
 ### Prerequisites
 
 - Python 3.10+
-- OpenRouter API key
+- DeepSeek API key
+
+Commentary - Deepseek was chosen as main LLM due to its incredible price/quality ratio
+
 
 ### Installation
 
@@ -28,7 +31,7 @@ playwright install chromium
 
 # Configure environment
 cp .env.example .env
-# Edit .env and add your OPENROUTER_API_KEY
+# Edit .env and add your DEEPSEEK_API_KEY
 ```
 
 ### Usage
@@ -87,12 +90,6 @@ src/
 
 ## Development
 
-### Running Tests
-
-```bash
-pytest tests/
-```
-
 ### Adding New Tools
 
 1. Define tool function in `src/tools/`
@@ -103,11 +100,3 @@ pytest tests/
 
 - Sensitive actions (payments, deletions) require user confirmation
 - Credentials are never logged
-- User data stored locally with encryption
-
-## Roadmap
-
-- [ ] Multi-page workflows
-- [ ] Browser session persistence
-- [ ] Plugin system for domain-specific actions
-- [ ] Web UI for monitoring

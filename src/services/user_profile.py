@@ -1,8 +1,3 @@
-"""
-User profile management service.
-Handles loading, saving, and encrypting user preferences.
-"""
-
 import json
 from pathlib import Path
 from typing import Optional

@@ -8,7 +8,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langchain_core.messages import AIMessage, ToolMessage, AIMessageChunk
 
 from agent.graph import get_agent
-from agent.state import AgentState, create_initial_state
+from agent.state import create_initial_state
 from browser.manager import BrowserManager
 from config.settings import settings
 from utils.logger import setup_logger, logger

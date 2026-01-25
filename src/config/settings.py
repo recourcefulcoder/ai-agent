@@ -1,4 +1,3 @@
-from typing import Optional
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -11,10 +10,10 @@ class Settings(BaseSettings):
         extra="ignore"
     )
     
-    openrouter_api_key: str
-    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    deepseek_api_key: str
+    deepseek_base_url: str = "https://api.deepseek.com/"
     
-    default_llm_model: str = "z-ai/glm-4.5-air:free"
+    default_llm_model: str = "deepseek-chat"
     
     browser_headless: bool = False
     browser_slow_mo: int = 100

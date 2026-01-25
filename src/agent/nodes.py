@@ -31,8 +31,6 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     logger.info("Planning task...")
     
     user_request = state.get("user_request")
-    
-    tools = create_interaction_tools() + create_navigation_tools()
 
     llm = (
         get_llm_service()
