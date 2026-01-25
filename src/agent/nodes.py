@@ -5,7 +5,7 @@ from rich.panel import Panel
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 
 from agent.state import AgentState
-from models.task import TaskPlan, BrowserActionSuggestion, DangerCheck
+from models.task import TaskPlan, BrowserActionSuggestion, DangerCheck, PlanGoalAchieved
 from utils.logger import logger
 from services.llm import get_llm_service
 from tools.interaction import create_interaction_tools
