@@ -1,5 +1,4 @@
-from enum import Enum
-from typing import Optional, List
+from typing import List
 from pydantic import BaseModel, Field
 
 
@@ -15,9 +14,11 @@ class TaskPlan(BaseModel):
     )  # TODO: Edit description for AI to better understand planning
     
     def __str__(self) -> str:
-        """Human-readable representation of the plan."""
-        # TODO: Implement pretty-printing of the plan
-        pass
+        ans = f"Current plan for the task '{self.task_description}':"
+        for step in self.steps:
+            ans += f"\n- {step}"
+        ans += "\n"
+        return ans
 
 
 class BrowserActionSuggestion(BaseModel):
@@ -43,23 +44,6 @@ class PlanGoalAchieved(BaseModel):
         default=False,
         description="Answer to question whether curren plan goal achieved at this point"
     )
-
-
-class TaskPlan(BaseModel):
-    """
-    Structured plan for accomplishing a user's task.
-    """
-    task_description: str = Field(
-        description="Natural language description of what needs to be done"
-    )
-    steps: List[str] = Field(
-        description="Ordered list of subtasks to accomplish the task"
-    )  # TODO: Edit description for AI to better understand planning
-    
-    def __str__(self) -> str:
-        """Human-readable representation of the plan."""
-        # TODO: Implement pretty-printing of the plan
-        pass
 
 
 # class TaskResult(BaseModel):

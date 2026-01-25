@@ -41,14 +41,15 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
     messages = state.get("messages") + [HumanMessage(content=user_request)]
     
     response = llm.invoke(messages)
+    response_msg = AIMessage(content=str(response))
     
     logger.info(f"Planning response received")
     
     return {
         "task_plan": response,
         "current_plan_step_ind": 0,
-        "messages": [response],
-        "current_plan_step_messages": [response],
+        "messages": [response_msg],
+        "current_plan_step_messages": [response_msg],
     }
 
 
@@ -133,7 +134,7 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
 
     messages = [
         SystemMessage(content=settings.get_prompt("safety_check")),
-        AIMessage(content=state.current_action.description)
+        AIMessage(content=state.get("current_action").description)
     ]
 
     is_sensitive = llm.invoke(messages)
