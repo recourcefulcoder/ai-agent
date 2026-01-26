@@ -1,5 +1,6 @@
 from typing import Literal
 from langgraph.graph import StateGraph, END
+from langgraph.prebuilt import ToolNode
 from agent.state import AgentState
 from agent.nodes import (
     plan_task_node,
@@ -118,7 +119,7 @@ def create_agent_graph() -> StateGraph:
     workflow.add_node("choose_action", choose_next_action_node)
     workflow.add_node("confirm", seek_confirmation_node)
     workflow.add_node("reflect", reflect_browser_action_node)
-    workflow.add_node("perform_action", perform_action_node)
+    workflow.add_node("perform_action", ToolNode(tools))
     workflow.add_node("finalize", finalize_node)
 
     # Dummy node for continue_check that just passes through

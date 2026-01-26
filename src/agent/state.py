@@ -2,8 +2,8 @@ from typing import Annotated, List, Optional
 from typing_extensions import TypedDict
 
 from langgraph.graph import add_messages
-from langchain_core.messages import SystemMessage,AIMessage, HumanMessage
-from models.task import TaskPlan, BrowserActionSuggestion
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
+from models.task import TaskPlan
 from browser.manager import BrowserManager
 
 from config.settings import settings
@@ -17,7 +17,7 @@ class AgentState(TypedDict):
 
     current_plan_step_ind: Optional[int]
     current_plan_step_messages: Optional[List[AIMessage | SystemMessage]]
-    current_action: Optional[BrowserActionSuggestion]
+    current_action: Optional[str]
     
     # execution_results: List[ExecutionResult]
     browser_manager: BrowserManager

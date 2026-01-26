@@ -57,6 +57,8 @@ class ElementLocator:
         logger.info("Extracting informative elements from accessibility tree...")
         
         accessibility_tree = await page.accessibility.snapshot()
+
+        logger.info(accessibility_tree)
         
         if not accessibility_tree:
             logger.warning("No accessibility tree available")
@@ -256,4 +258,6 @@ class ElementLocator:
             #  this way nodes with actual data ("leafs" of the tree) will be represented 
             #  first, which is good for prompting
         
+        logger.info(f"NODE: {role}|{name}; \nCONTENTS:{informative_elements}")
+
         return informative_elements

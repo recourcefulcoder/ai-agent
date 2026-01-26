@@ -20,23 +20,14 @@ class TaskPlan(BaseModel):
         ans += "\n"
         return ans
 
-
-class BrowserActionSuggestion(BaseModel):
-    """Represent chose-action node's suggestion on what action on browser should it perform to achieve the goal"""
-    description: str = Field(
-        default=None,
-        description="Detailed description of what do you want to do on the browser page",
-    )
-    reasoning: str = Field(
-        default=None,
-        description="Reasoning - why this action is being performed"
-    )
-
-
 class DangerCheck(BaseModel):
     is_sensitive: bool = Field(
         default=False,
         descrpition="Answer to whether suggested action is dangerous (i.e. sensitive); true if it is, false if it isn't"
+    )
+    reasoning: bool = Field(
+        default=False,
+        descrpition="Reasoning to why is action sensitive"
     )
 
 class PlanGoalAchieved(BaseModel):
@@ -45,19 +36,3 @@ class PlanGoalAchieved(BaseModel):
         description="Answer to question whether curren plan goal achieved at this point"
     )
 
-
-# class TaskResult(BaseModel):
-#     success: bool = Field(
-#         description="Whether the overall task succeeded"
-#     )
-#     message: str = Field(
-#         description="Summary message for the user"
-#     )
-#     execution_results: List[ExecutionResult] = Field(
-#         default_factory=list,
-#         description="Results of individual actions"
-#     )
-#     artifacts: List[str] = Field(
-#         default_factory=list,
-#         description="Paths to screenshots or other generated files"
-#     )

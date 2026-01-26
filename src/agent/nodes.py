@@ -5,7 +5,7 @@ from rich.panel import Panel
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 
 from agent.state import AgentState
-from models.task import TaskPlan, BrowserActionSuggestion, DangerCheck, PlanGoalAchieved
+from models.task import TaskPlan, DangerCheck, PlanGoalAchieved
 from utils.logger import logger
 from services.llm import get_llm_service
 from tools.interaction import create_interaction_tools
@@ -56,7 +56,7 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
 
 def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
     """
-    Execution node: Decides what browser action should be taken next to achieve current plan goal
+    Execution node: Decides what browser action should be taken next to achieve current plan goal and makes tool calls; eecution though is mad eiwthin different node
     
     This node uses the LLM with tools to decide and what browser action to perform, updates 
     state with "current browser action" 
@@ -69,18 +69,20 @@ def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
     """
     logger.info("Executing action...")
 
+    tools = create_interaction_tools() + create_navigation_tools()
+
     llm = (
         get_llm_service()
         .get_main_llm()
-        .with_structured_output(BrowserActionSuggestion)        
+        .bind_tools(tools)        
     )
 
-    logger.info(f"{state.get('messages')}")
+    # logger.info(f"{state.get('messages')}")
 
     response = llm.invoke(state.get("messages"))
     
     return {
-        "current_action": response,
+        "current_action": response.content,
     }
 
 def reflect_browser_action_node(state: AgentState):
@@ -125,7 +127,6 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     
     console = Console()
     action_to_check = state.get("current_action")
-    is_sensitive = False
     
     llm = (
         get_llm_service()
@@ -135,12 +136,13 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
 
     messages = [
         SystemMessage(content=settings.get_prompt("safety_check")),
-        AIMessage(content=state.get("current_action").description)
+        AIMessage(content=state.get("current_action"))
     ]
 
-    is_sensitive = llm.invoke(messages)
+    res = llm.invoke(messages)
 
-    if is_sensitive:
+    if res.is_sensitive:
+        logger.info(res.reasoning)
         console.print(Panel(
             f"[bold yellow]Confirmation Required[/bold yellow]\n\n{action_to_check.description}",
             border_style="yellow"
