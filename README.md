@@ -58,15 +58,16 @@ python src/main.py --interactive
 3. **LLM Layer** (OpenRouter): Natural language understanding and decision-making
 4. **Tools Layer**: LangChain tools bridging AI and browser
 
-### Workflow
+### Architecture/workflow
 
-```
-User Input → Planning Node → Execution Node → Verification Node → Output
-                ↓               ↓                    ↓
-           Task Plan    Browser Actions      Success Check
-                                                     ↓
-                                              [Retry/Error Handler]
-```
+Generally provided agent is a ReAct agent, following given workflow:
+
+- `Planning node` - plans out task in general
+- `Choosing action node` - decides what should it do next, without calling tools yet
+- `Confirmation node` - decides whether action agent is about to do dangerous and requires user confirmation; if it does, requests one
+- `Execution node` - decides what tools to call and performs that tool calls
+- `Reflection node` - keeps track of plan achievement, if achieved prompts agent to proceed with next plan step (returns to `Choosing action node`)
+- `Finalizing node` - returns generalization on work done
 
 ## Configuration
 

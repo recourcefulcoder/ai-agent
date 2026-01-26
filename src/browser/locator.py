@@ -246,11 +246,13 @@ class ElementLocator:
                     'contents': content
                 })
         
+        
         for child in node.get('children', []):
-            informative_elements = cls._extract_informative_nodes(
+            inf_cpy = cls._extract_informative_nodes(
                 child, 
                 informative_elements,
             ) + informative_elements
+            informative_elements = inf_cpy.copy()
             #  this way nodes with actual data ("leafs" of the tree) will be represented 
             #  first, which is good for prompting
         

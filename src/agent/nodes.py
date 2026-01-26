@@ -102,7 +102,7 @@ def reflect_browser_action_node(state: AgentState):
     if decision.is_achieved:
         return {
             "messages": [SystemMessage(
-                content="goal for current plan step is achieved, proceeding with next step"
+                content="goal for current plan step is achieved, proceeding with next step of the plan"
             )],
             "current_plan_step_messages": [],
             "current_plan_step_ind": step_ind + 1,

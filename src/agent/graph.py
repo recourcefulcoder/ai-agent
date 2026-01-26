@@ -134,7 +134,7 @@ def create_agent_graph() -> StateGraph:
         user_confirmed_action,
         {
             "confirmed": "perform_action",
-            "rejected": "reflect",
+            "rejected": "finalize",
         }
     )
     

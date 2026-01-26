@@ -669,7 +669,7 @@ class GetInformativeElementsTool(BaseTool):
             
             new_cache = dict()
             for element in elements:
-                new_cache[element['id']] = element
+                new_cache[element.get('id')] = element
             
             ElementsCacheManager().set_informative_cache(new_cache, page.url)
             
