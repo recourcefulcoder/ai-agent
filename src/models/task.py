@@ -25,7 +25,7 @@ class DangerCheck(BaseModel):
         default=False,
         descrpition="Answer to whether suggested action is dangerous (i.e. sensitive); true if it is, false if it isn't"
     )
-    reasoning: bool = Field(
+    reasoning: str = Field(
         default=False,
         descrpition="Reasoning to why is action sensitive"
     )

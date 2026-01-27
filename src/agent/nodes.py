@@ -56,7 +56,7 @@ def plan_task_node(state: AgentState) -> Dict[str, Any]:
 
 def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
     """
-    Execution node: Decides what browser action should be taken next to achieve current plan goal and makes tool calls; eecution though is mad eiwthin different node
+    Execution node: Decides what browser action should be taken next to achieve current plan goal and makes tool calls; execution though is mad eiwthin different node
     
     This node uses the LLM with tools to decide and what browser action to perform, updates 
     state with "current browser action" 
@@ -67,7 +67,7 @@ def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
     Returns:
         Updated state with execution result
     """
-    logger.info("Executing action...")
+    logger.info("Choosing next action...")
 
     tools = create_interaction_tools() + create_navigation_tools()
 
@@ -80,9 +80,12 @@ def choose_next_action_node(state: AgentState) -> Dict[str, Any]:
     # logger.info(f"{state.get('messages')}")
 
     response = llm.invoke(state.get("messages"))
+    for tool_call in response.tool_calls:
+        logger.info(f'TOOLCALL: {tool_call["name"]}, {tool_call["args"]}')
     
     return {
         "current_action": response.content,
+        "messages": [response],
     }
 
 def reflect_browser_action_node(state: AgentState):
@@ -144,7 +147,7 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
     if res.is_sensitive:
         logger.info(res.reasoning)
         console.print(Panel(
-            f"[bold yellow]Confirmation Required[/bold yellow]\n\n{action_to_check.description}",
+            f"[bold yellow]Confirmation Required[/bold yellow]\n\n{action_to_check}",
             border_style="yellow"
         ))
         

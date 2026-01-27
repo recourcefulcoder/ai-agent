@@ -34,7 +34,7 @@ class ElementsCacheManager:
         return cls._instance
     
     def __init__(self):
-        if hasattr(self._initialized):
+        if hasattr(self, "_initialized"):
             return
         self._initialized = True
         self._cache_mapping: Dict[str, PageCache] = dict()

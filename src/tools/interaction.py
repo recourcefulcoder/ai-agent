@@ -524,7 +524,7 @@ class GetElementContextTool(BaseTool):
 class GetInteractiveElementsTool(BaseTool):
     name: str = "get_interactive_elements"
     description: str = """
-    Get a list of all interactive elements on the current page.
+    Get a list of all interactive elements on the current page, meaning those elements of HTML page that you can interact with, in order to achieve some state change on the page.
     Returns information about buttons, links, inputs, and other clickable HTML elements of the page as JSON dictionary, where keys are element's attributes (index, name, value (meaning inside value), etc.), and values are values of those attributes.
     Each element gets a unique ID that can be used with other tools like click_element or input_text.
     
@@ -552,13 +552,17 @@ class GetInteractiveElementsTool(BaseTool):
             return "Error: Browser not connected."
         
         try:
-            elements = await ElementLocator().list_informative_elements(page)
+            elements = await ElementLocator().list_interactive_elements(page)
+
+            logger.info("interactive_elements_accepted")
             
             new_cache = dict()
             for element in elements:
                 new_cache[element.get('selector')] = element
             
             ElementsCacheManager().set_interactive_cache(new_cache, page.url)
+
+            logger.info("Cache set")
             
             if not elements:
                 return "No interactive elements found on the page."
@@ -568,9 +572,10 @@ class GetInteractiveElementsTool(BaseTool):
             # Group by type for better readability
             by_type: Dict[str, List[Dict]] = dict()
             for elem in elements:
+                logger.info(f"ELEM_TYPE: {elem_type}, {type(elem_type)}")
                 elem_type = elem.get('type', 'unknown')
                 if elem_type not in by_type:
-                    by_type[elem_type] = []
+                    by_type[elem_type] = list()
                 by_type[elem_type].append(elem)
             
             result += str(by_type) + f"\nTotal: {len(elements)} elements available for interaction"
@@ -596,7 +601,7 @@ class GetInteractiveElementsTool(BaseTool):
             return "Error: Browser not connected."
         
         try:
-            elements = ElementLocator().list_informative_elements(page)
+            elements = ElementLocator().list_interactive_elements(page)
             
             new_cache = dict()
             for element in elements:

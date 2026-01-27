@@ -215,7 +215,7 @@ class ElementLocator:
     def _extract_informative_nodes(
         cls, 
         node, 
-        informative_elements: List[Dict[str, str]]
+        # informative_elements: List[Dict[str, str]]
     ) -> List[Dict[str, str]]:
         """
         Recursively extract informative elements from the Accessibility tree.
@@ -223,6 +223,7 @@ class ElementLocator:
         """
         role = node.get('role')
         name = node.get('name', '').strip()
+        informative_elements = []
         
         if role in cls._informative_roles:
             content = name
@@ -248,16 +249,15 @@ class ElementLocator:
                     'contents': content
                 })
         
-        
+        children_info = []
         for child in node.get('children', []):
-            inf_cpy = cls._extract_informative_nodes(
+            child_info = cls._extract_informative_nodes(
                 child, 
-                informative_elements,
-            ) + informative_elements
-            informative_elements = inf_cpy.copy()
-            #  this way nodes with actual data ("leafs" of the tree) will be represented 
-            #  first, which is good for prompting
+                # informative_elements,
+            )
+            children_info = child_info + children_info
+        informative_elements = children_info + informative_elements
         
-        logger.info(f"NODE: {role}|{name}; \nCONTENTS:{informative_elements}")
+        # logger.info(f"NODE: {role}|{name}; \nCONTENTS:{informative_elements}")
 
         return informative_elements
