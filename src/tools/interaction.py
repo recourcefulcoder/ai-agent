@@ -72,13 +72,13 @@ class ClickElementTool(BaseTool):
             return f"Error: Element with selector {element_selector} not found. Use 'get_interactive_elements' first to get the list of elements."
         
         element_info = cache.get(element_selector)
-        selector = element_info.get('selector')
+        # selector = element_info.get('selector')
         
         try:
-            element = page.locator(selector).first
+            element = page.locator(element_selector).first
             
             if await element.count() == 0:
-                return f"Error: Element with selector '{selector}' not found on the page. The page may have changed."
+                return f"Error: Element with selector '{element_selector}' not found on the page. The page may have changed."
             
             if not await element.is_visible():
                 logger.warning(f"Element {element_selector} is not visible, attempting to scroll into view")

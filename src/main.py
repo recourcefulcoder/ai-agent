@@ -51,7 +51,7 @@ async def execute_task(
         step_count = 0
         
         config = {
-            "configurable": {"recursion_limit": 100}
+            "recursion_limit": 100,
         }
 
         async for chunk, _ in agent.astream(
