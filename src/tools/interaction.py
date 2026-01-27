@@ -554,13 +554,15 @@ class GetInteractiveElementsTool(BaseTool):
         try:
             elements = await ElementLocator().list_interactive_elements(page)
 
-            logger.info("interactive_elements_accepted")
+            logger.info(f"interactive_elements_accepted: {elements}")
             
             new_cache = dict()
             for element in elements:
                 new_cache[element.get('selector')] = element
             
-            ElementsCacheManager().set_interactive_cache(new_cache, page.url)
+            logger.info(f"Cache formed; {page.url}, {type(page.url)}")
+
+            ElementsCacheManager().set_interactive_cache(page.url, new_cache)
 
             logger.info("Cache set")
             
@@ -572,7 +574,6 @@ class GetInteractiveElementsTool(BaseTool):
             # Group by type for better readability
             by_type: Dict[str, List[Dict]] = dict()
             for elem in elements:
-                logger.info(f"ELEM_TYPE: {elem_type}, {type(elem_type)}")
                 elem_type = elem.get('type', 'unknown')
                 if elem_type not in by_type:
                     by_type[elem_type] = list()

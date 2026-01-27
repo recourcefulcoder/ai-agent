@@ -57,8 +57,6 @@ class ElementLocator:
         logger.info("Extracting informative elements from accessibility tree...")
         
         accessibility_tree = await page.accessibility.snapshot()
-
-        logger.info(accessibility_tree)
         
         if not accessibility_tree:
             logger.warning("No accessibility tree available")

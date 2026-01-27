@@ -5,6 +5,8 @@ from playwright.sync_api import Page
 
 from browser.locator import ElementLocator
 
+from utils.logger import logger
+
 
 @dataclass
 class PageCache:
@@ -51,7 +53,7 @@ class ElementsCacheManager:
         page_url: str, 
         interactive_cache: Dict[str, Dict[str, Any]]
     ) -> None:
-        if self._cache_mapping.get(page_url, None) is None:
+        if self._cache_mapping.get(page_url) is None:
             self._cache_mapping[page_url] = PageCache()
         self.del_interactve_updates(page_url)
         self._cache_mapping[page_url].interactive_cache = interactive_cache
@@ -61,7 +63,7 @@ class ElementsCacheManager:
         page_url: str, 
         informative_cache: Dict[str, Dict[str, Any]]
     ) -> None:
-        if self._cache_mapping.get(page_url, None) is None:
+        if self._cache_mapping.get(page_url) is None:
             self._cache_mapping[page_url] = PageCache()
         self.del_info_updates(page_url)
         self._cache_mapping[page_url].informative_cache = informative_cache
@@ -121,7 +123,7 @@ class ElementsCacheManager:
                 self._cache_mapping.get(page.url).interactive_updates[element["selector"]] = element
 
     def del_info_updates(self, page_url: str):
-        self._cache_mapping.get(page_url, PageCache()).informative_updates.clear()
+        self._cache_mapping.get(page_url, PageCache()).info_updates.clear()
 
     def del_interactve_updates(self, page_url: str):
         self._cache_mapping.get(page_url, PageCache()).interactive_updates.clear()
