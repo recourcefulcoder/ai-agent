@@ -574,7 +574,7 @@ class GetInteractiveElementsTool(BaseTool):
             # Group by type for better readability
             by_type: Dict[str, List[Dict]] = dict()
             for elem in elements:
-                elem_type = elem.get('type', 'unknown')
+                elem_type = elem.get('type', 'unknown') 
                 if elem_type not in by_type:
                     by_type[elem_type] = list()
                 by_type[elem_type].append(elem)

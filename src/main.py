@@ -50,9 +50,14 @@ async def execute_task(
         final_state = None
         step_count = 0
         
+        config = {
+            "configurable": {"recursion_limit": 100}
+        }
+
         async for chunk, _ in agent.astream(
             initial_state, 
             stream_mode="messages",
+            config=config,
         ):
             step_count += 1
 
