@@ -80,9 +80,13 @@ class ClickElementTool(BaseTool):
             if await element.count() == 0:
                 return f"Error: Element with selector '{element_selector}' not found on the page. The page may have changed."
             
-            if not await element.is_visible():
-                logger.warning(f"Element {element_selector} is not visible, attempting to scroll into view")
-                await element.scroll_into_view_if_needed()
+            try:
+                if not await element.is_visible():
+                    logger.warning(f"Element {element_selector} is not visible, attempting to scroll into view")
+                    await element.scroll_into_view_if_needed()
+            except PlaywrightTimeoutError:
+                # meaning element can't be scrolled into view - I decided to still use it though.
+                pass
 
             result = f"Successfully clicked: {element_info.get('type')}"
 
@@ -116,6 +120,26 @@ class ClickElementTool(BaseTool):
                 result += f"\nState change! Current tab redirected to following url: {self.browser_manager._current_page.url}"             
 
             await self.browser_manager._current_page.wait_for_load_state()
+
+            if not new_tab and not navigation_event:
+                
+                await ElementsCacheManager().track_dom_changes(page)
+
+                info_updates = ElementsCacheManager().get_info_updates(page.url)
+                inter_updates = ElementsCacheManager().get_interactive_updates(page.url)
+                logger.info(f"TYPE: {type(inter_updates)}; VALUES: {inter_updates}")
+
+                if len(inter_updates) != 0:
+                    result += f"\nState change: new interactive elements appeared on page; information on them lower:\n {'{'}"
+                    for value in inter_updates.values():
+                        result += f"\n{value}, "
+                    result += "\n}"
+                if len(info_updates) != 0:
+                    result += f"\nState change: new informative elements appeared on page; information on them lower:\n {'{'}"
+                    for value in info_updates:
+                        result += f"\n{value}, "
+                    result += "\n}"
+
             
             logger.info(f"Click completed: {element_info.get('type')}")
             return result
