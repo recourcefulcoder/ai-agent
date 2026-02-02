@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List
 from playwright.async_api import Page, Locator
 from utils.logger import logger
 
@@ -169,7 +169,10 @@ class ElementLocator:
                             "input_type": attributes.get('type') if tag_name == 'input' else None,
                         }
                         
-                        element_info["selector"] = self._generate_selector(element_info)
+                        element_info["selector"] = await self._generate_selector(
+                            element_info, 
+                            element
+                        )
 
                         # I (dev) remove None values to reduce token cost
                         element_info = {k: v for k, v in element_info.items() if v is not None}
@@ -188,7 +191,7 @@ class ElementLocator:
         return interactive_elements
     
     @staticmethod
-    def _generate_selector(attributes: Dict[str, Any]) -> str:
+    async def _generate_selector(attributes: Dict[str, Any], element: Locator) -> str:
         """
         Generate a stable CSS selector for an element.
         
@@ -214,7 +217,8 @@ class ElementLocator:
         if attributes.get("title"):
             return f"{tag_name}[title='{attributes['title']}']"
         
-        return "unknown"
+        class_name = await element.evaluate("el => el.className")
+        return f"{tag_name}[class='{class_name}']"
 
     @classmethod
     def _extract_informative_nodes(
