@@ -62,7 +62,7 @@ class ElementLocator:
             logger.warning("No accessibility tree available")
             return []
                
-        informative_elements = self._extract_informative_nodes(accessibility_tree, [])
+        informative_elements = self._extract_informative_nodes(accessibility_tree)
         logger.info(f"Extracted {len(informative_elements)} informative elements")
         return informative_elements
     

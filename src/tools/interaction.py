@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import List, Dict
 
@@ -73,8 +74,6 @@ class ClickElementTool(BaseTool):
             return f"Error: Element with selector {element_selector} not found. Use 'get_interactive_elements' first to get the list of elements."
         
         element_info = cache.get(element_selector)
-        # selector = element_info.get('selector')
-        logger.info("before try valid")
         try:
             element = page.locator(element_selector).first
             
@@ -87,44 +86,36 @@ class ClickElementTool(BaseTool):
 
             result = f"Successfully clicked: {element_info.get('type')}"
 
-            # clear all update info before interaction
             ElementsCacheManager().del_page_updates(page.url)
+            new_page_task = asyncio.create_task(page.context.wait_for_event("page", timeout=1000))
+            navigation_task = asyncio.create_task(page.wait_for_event("framenavigated", timeout=1000))
 
-            logger.info("update info deleted")
-            try:
-                async with page.expect_popup(timeout=1000) as popup_info:
-                    await element.click(force=True)
-                popup = popup_info.value
-                await popup.wait_for_load_state("domcontentloaded")
-                self.browser_manager._current_page = popup
-                self.browser_manager._current_page.on(
-                    "domcontentlodaded", 
-                    ElementsCacheManager().track_dom_changes
+            logger.info("tasks successfully created")
+            await element.click(force=True)
+
+            results = await asyncio.gather(new_page_task, navigation_task, return_exceptions=True)
+            new_tab = results[0] if not isinstance(results[0], (Exception, TimeoutError)) else None
+            navigation_event = results[1] if not isinstance(results[1], (Exception, TimeoutError)) else None
+
+
+            if new_tab:
+                await new_tab.wait_for_load_state("domcontentloaded")
+                logger.info("new tab opened")
+                self.browser_manager._current_page = new_tab
+                await self.browser_manager._current_page.wait_for_load_state()
+                await ElementsCacheManager().track_dom_changes(
+                    self.browser_manager._current_page
                 )
-                logger.info(f"Opened new tab with URL: {popup.url}")
-                result += f"\nState change: Opened new tab with URL: {popup.url}"
-                return result
                 
-            except PlaywrightTimeoutError as e:
-                # No popup appeared, element was clicked on the same page
-                logger.info(f"Timeout error: {e}")
-                pass
-            
-            await self.browser_manager._current_page.wait_for_load_state()
-            
-            inter_updates = ElementsCacheManager().get_interactive_updates(page.url)
-            info_updates = ElementsCacheManager().get_info_updates(page.url)
+                logger.info(f"Opened new tab with URL: {new_tab.url}")
+                logger.info(f"current page url: {self.browser_manager.current_url}")
+                result += f"\nState change! Opened new tab with URL: {new_tab.url}"
 
-            if len(inter_updates.keys()) != 0:
-                result += f"\nState change: new interactive elements appeared on page; information on them lower\n {'{'}"
-                for value in inter_updates.value():
-                    result += f"\n{value}, "
-                result += "\n}"
-            if len(info_updates.keys()) != 0:
-                result += f"\nState change: new informative elements appeared on page; information on them lower:\n {'{'}"
-                for value in info_updates.value():
-                    result += f"\n{value}, "
-                result += "\n}"
+            if navigation_event:
+                logger.info("navigation event occured")
+                result += f"\nState change! Current tab redirected to following url: {self.browser_manager._current_page.url}"             
+
+            await self.browser_manager._current_page.wait_for_load_state()
             
             logger.info(f"Click completed: {element_info.get('type')}")
             return result
@@ -144,6 +135,7 @@ class ClickElementTool(BaseTool):
         Returns:
             Success or error message
         """        
+        raise RuntimeError("SYNCH TOOL VERSION WAS RUN")
         page = self.browser_manager.current_page
         
         if not page:

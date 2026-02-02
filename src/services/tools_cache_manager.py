@@ -50,6 +50,10 @@ class ElementsCacheManager:
             return None 
         return page_cache.interactive_cache
     
+    def create_page_cache(self, page_url: str) -> None:
+        page_url = truncate_to_base_url(page_url)
+        self._cache_mapping[page_url] = PageCache()
+
     def set_interactive_cache(
         self, 
         page_url: str, 
@@ -105,17 +109,16 @@ class ElementsCacheManager:
         Returns updates of interactive elements on page with specified url
         """
         page_url = truncate_to_base_url(page_url)
-        logger.info(f"REQUESTED UPDATE INFO: {page_url}")
         return self._cache_mapping.get(page_url).interactive_updates
 
-    def track_dom_changes(self, page: Page) -> None:
+    async def track_dom_changes(self, page: Page) -> None:
         # page value implied to be valid
         page_url = truncate_to_base_url(page.url)
         if self._cache_mapping.get(page_url, None) is None:
             self._cache_mapping[page_url] = PageCache()
 
-        info_cache = ElementLocator().list_informative_elements(page)
-        inter_cache = ElementLocator().list_interactive_elements(page)
+        info_cache = await ElementLocator().list_informative_elements(page)
+        inter_cache = await ElementLocator().list_interactive_elements(page)
 
         delta_info = set(info_cache.values()).difference(
             set(self._cache_mapping.get(page_url).informative_cache.values())
