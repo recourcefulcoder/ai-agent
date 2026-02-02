@@ -103,6 +103,10 @@ def reflect_browser_action_node(state: AgentState):
     goal = f"current goal is: {goal}"
     context = state.get("current_plan_step_messages") + [SystemMessage(content=goal)]
 
+
+    tool_call = state.get("messages")[-1]
+    logger.info(f"REFLECT NODE: {tool_call}")
+    
     decision = llm.invoke(context)
     if decision.is_achieved:
         return {

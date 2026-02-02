@@ -48,11 +48,12 @@ class ClickElementTool(BaseTool):
     name: str = "click_element"
     description: str = """
     Click on an interactive element on the page.
-    You must first use 'get_interactive_elements' to get the list of elements and their IDs.
+    You must first use 'get_interactive_elements' to get the list of elements and their selectors.
     Then use this tool with the element's unique selector value to click it.
     This tool returns update on browser changes, if any occured; it may be opening of new window, or new pop-up window appeared, or any changes on the page itself.
     
     Example: click_element(element_selector="#button_id")
+    Example: click_element(element_selector='button[aria_label="See Also"]')
     """
     args_schema: type[BaseModel] = ClickElementInput
     browser_manager: BrowserManager = Field(
@@ -62,18 +63,18 @@ class ClickElementTool(BaseTool):
 
     async def _arun(self, element_selector: str) -> str:
         page = self.browser_manager.current_page
-        
+        logger.info("CLICKASYNC TOOL RUN")
         if not page:
             return "Error: Browser not connected. Use the browser manager to connect first."
         
-        cache = ElementsCacheManager().get_cache(await page.url)
+        cache = ElementsCacheManager().get_cache(page.url)
 
         if cache is None or element_selector not in cache.keys():
             return f"Error: Element with selector {element_selector} not found. Use 'get_interactive_elements' first to get the list of elements."
         
         element_info = cache.get(element_selector)
         # selector = element_info.get('selector')
-        
+        logger.info("before try valid")
         try:
             element = page.locator(element_selector).first
             
@@ -89,9 +90,10 @@ class ClickElementTool(BaseTool):
             # clear all update info before interaction
             ElementsCacheManager().del_page_updates(page.url)
 
+            logger.info("update info deleted")
             try:
-                async with await page.expect_popup(timeout=1000) as popup_info:
-                    await element.click()
+                async with page.expect_popup(timeout=1000) as popup_info:
+                    await element.click(force=True)
                 popup = popup_info.value
                 await popup.wait_for_load_state("domcontentloaded")
                 self.browser_manager._current_page = popup
@@ -103,8 +105,9 @@ class ClickElementTool(BaseTool):
                 result += f"\nState change: Opened new tab with URL: {popup.url}"
                 return result
                 
-            except PlaywrightTimeoutError:
+            except PlaywrightTimeoutError as e:
                 # No popup appeared, element was clicked on the same page
+                logger.info(f"Timeout error: {e}")
                 pass
             
             await self.browser_manager._current_page.wait_for_load_state()
@@ -113,7 +116,7 @@ class ClickElementTool(BaseTool):
             info_updates = ElementsCacheManager().get_info_updates(page.url)
 
             if len(inter_updates.keys()) != 0:
-                result += f"\nState change: new interactive elements appeared on page; information on them lower:\n {'{'}"
+                result += f"\nState change: new interactive elements appeared on page; information on them lower\n {'{'}"
                 for value in inter_updates.value():
                     result += f"\n{value}, "
                 result += "\n}"

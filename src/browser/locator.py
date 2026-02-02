@@ -11,7 +11,7 @@ class ElementLocator:
     _informative_roles = {
         'article', 'section', 'paragraph', 'listitem', 'blockquote', 
         'heading', 'text', 'list', 'figure', 'img', 'link',
-        'code', 'pre', 'table', 'row', 'cell',
+        'code', 'pre', 'table', 'row', 'cell', 'menu', 'menuitem',
         'definition', 'term', 'note', 'complementary',
         'navigation', 'region', 'contentinfo', 'banner', 'text leaf'
     }  # roles of A11y tree elements those may hold valuable textual information
@@ -154,17 +154,14 @@ class ElementLocator:
                         except:
                             pass
                         
-                        selector_str = await self._generate_selector(element, attributes)
-                        
                         element_info = {
                             "id": attributes.get('id'),
                             "tag_name": tag_name,
                             "contents": contents.strip(),
                             "label": label.strip() if label else None,
                             "placeholder": attributes.get('placeholder'),
-                            "aria_label": attributes.get('ariaLabel'),
+                            "aria-label": attributes.get('ariaLabel'),
                             "role": attributes.get('role'),
-                            "selector": selector_str,
                             "is_enabled": is_enabled,
                             "name": attributes.get('name'),
                             "href": attributes.get('href'),
@@ -172,6 +169,8 @@ class ElementLocator:
                             "input_type": attributes.get('type') if tag_name == 'input' else None,
                         }
                         
+                        element_info["selector"] = self._generate_selector(element_info)
+
                         # I (dev) remove None values to reduce token cost
                         element_info = {k: v for k, v in element_info.items() if v is not None}
                         interactive_elements.append(element_info)
@@ -189,12 +188,11 @@ class ElementLocator:
         return interactive_elements
     
     @staticmethod
-    async def _generate_selector(element: Locator, attributes: Dict[str, Any]) -> str:
+    def _generate_selector(attributes: Dict[str, Any]) -> str:
         """
         Generate a stable CSS selector for an element.
         
         Args:
-            element: The Playwright async locator
             attributes: Dictionary of element attributes
             
         Returns:
@@ -203,9 +201,18 @@ class ElementLocator:
         if attributes.get('id'):
             return f"#{attributes['id']}"
         
+        tag_name = attributes.get("tag_name")
         if attributes.get('name'):
-            tag_name = await element.evaluate('el => el.tagName.toLowerCase()')
             return f"{tag_name}[name='{attributes['name']}']"
+        
+        if attributes.get("aria-label"):
+            return f"{tag_name}[aria-label='{attributes['aria-label']}']"
+        
+        if attributes.get("label"):
+            return f"{tag_name}[label='{attributes['label']}']"
+        
+        if attributes.get("title"):
+            return f"{tag_name}[title='{attributes['title']}']"
         
         return "unknown"
 

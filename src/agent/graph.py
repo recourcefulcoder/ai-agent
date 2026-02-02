@@ -32,6 +32,7 @@ def should_continue_execution(state: AgentState) -> Literal["continue", "finaliz
 
 def user_confirmed_action(state: AgentState) -> Literal["confirmed", "rejected"]:
     """Checks whether current browser action was confirmed by user or not"""
+    logger.info(f'USERCONFIRMATION: {state.get("user_confirmed")}')
     if state.get("user_confirmed"):
         return "confirmed"
     return "rejected"
@@ -140,7 +141,6 @@ def create_agent_graph() -> StateGraph:
     )
     
     workflow.add_edge("perform_action", "reflect")
-    workflow.add_edge("reflect", "choose_action")   
     
     workflow.add_conditional_edges(
         "reflect",
