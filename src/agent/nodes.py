@@ -153,8 +153,6 @@ def seek_confirmation_node(state: AgentState) -> Dict[str, Any]:
         
         response = console.input("[bold yellow]Proceed? (yes/no):[/bold yellow] ").strip().lower()
         confirmed = response in ['yes', 'y']
-
-        # TODO: If user rejected action, SystemMessage of representing it should be added to state messages queue!
         
         logger.info(f"User {'confirmed' if confirmed else 'declined'} action")
         

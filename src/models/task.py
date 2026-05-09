@@ -11,7 +11,7 @@ class TaskPlan(BaseModel):
     )
     steps: List[str] = Field(
         description="Ordered list of subtasks to accomplish the task"
-    )  # TODO: Edit description for AI to better understand planning
+    ) 
     
     def __str__(self) -> str:
         ans = f"Current plan for the task '{self.task_description}':"

@@ -55,7 +55,7 @@ python src/main.py --interactive
 
 1. **Agent Layer** (LangGraph): Multi-node workflow for task planning and execution
 2. **Browser Layer** (Playwright): Web automation and page interaction
-3. **LLM Layer** (OpenRouter): Natural language understanding and decision-making
+3. **LLM Layer** (DeepSeek V4): Natural language understanding and decision-making
 4. **Tools Layer**: LangChain tools bridging AI and browser
 
 ### Architecture/workflow
@@ -74,9 +74,9 @@ Generally provided agent is a ReAct agent, following given workflow:
 See `.env.example` for all configuration options.
 
 Key settings:
-- `OPENROUTER_API_KEY`: Your OpenRouter API key
-- `DEFAULT_LLM_MODEL`: Model to use (default: anthropic/claude-sonnet-4)
-- `BROWSER_HEADLESS`: Run browser in headless mode (true/false)
+- `DEEPSEEK_API_KEY`: Your OpenRouter API key
+- `DEFAULT_LLM_MODEL`: DeepSeek model of your choice; must be one of stated in [docs](https://api-docs.deepseek.com/quick_start/pricing#model-details), default to `deepseek-v4-flash`
+- `BROWSER_HEADLESS`: Run browser in headless mode (true/false, defaults to false)
 
 ## Project Structure
 
@@ -84,9 +84,11 @@ Key settings:
 src/
 ├── agent/          # LangGraph agent implementation
 ├── browser/        # Playwright browser management
-├── tools/          # LangChain tools
+├── config/         # Pydantic project settings and core agent prompts
 ├── models/         # Pydantic models
-└── services/       # External service integrations
+├── services/       # External service integrations
+├── tools/          # LangChain tools
+└── utils/          # Helper functions for an agent to work
 ```
 
 ## Development
@@ -94,10 +96,8 @@ src/
 ### Adding New Tools
 
 1. Define tool function in `src/tools/`
-2. Add tool to registry in `src/tools/__init__.py`
-3. Update agent graph to include tool
+2. Update agent graph to include tool
 
 ## Safety
 
 - Sensitive actions (payments, deletions) require user confirmation
-- Credentials are never logged

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     deepseek_api_key: str
     deepseek_base_url: str = "https://api.deepseek.com/"
     
-    default_llm_model: str = "deepseek-chat"
+    default_llm_model: str = "deepseek-v4-flash"
     
     browser_headless: bool = False
     browser_slow_mo: int = 100
